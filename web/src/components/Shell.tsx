@@ -16,7 +16,9 @@ export const SCREENS: Screen[] = [
   { id: 'admin/cache', label: t('nav.cache'), area: 'admin' }
 ];
 export type ScreenId = Screen['id'];
-export const visibleScreens = (me: Me) => SCREENS.filter((s) => (s.id === 'account' ? me.multi_user : s.area === 'studio' || me.admin));
+// Accounts and the member view only exist in multi-user mode; local mode has one actor.
+export const visibleScreens = (me: Me) =>
+  SCREENS.filter((s) => (s.id === 'account' ? me.multi_user : s.id === 'admin/users' ? me.multi_user && me.admin : s.area === 'studio' || me.admin));
 // Reached from projects and screens only, so not in the nav.
 export const navScreens = (me: Me) => visibleScreens(me).filter((s) => s.nav !== false);
 export const areaOf = (id: ScreenId) => SCREENS.find((s) => s.id === id)?.area ?? 'studio';
@@ -68,7 +70,7 @@ export function TopBar({ current, onHelp, dark, onTheme }: { current: ScreenId; 
         )}
         {area === 'studio' && me.admin && (
           <>
-            <button onClick={() => viewAs(true)} title={t('nav.viewAsMemberTitle')} aria-label={t('nav.viewAsMember')} className="inline-flex items-center gap-1.5 hover:text-ink"><Eye size={15} /><span className="hidden xl:inline">{t('nav.viewAsMember')}</span></button>
+            {me.multi_user && <button onClick={() => viewAs(true)} title={t('nav.viewAsMemberTitle')} aria-label={t('nav.viewAsMember')} className="inline-flex items-center gap-1.5 hover:text-ink"><Eye size={15} /><span className="hidden xl:inline">{t('nav.viewAsMember')}</span></button>}
             <a href="#/admin/models" title={t('nav.adminConsole')} aria-label={t('nav.admin')} className="inline-flex items-center gap-1.5 hover:text-ink"><Shield size={15} /><span className="hidden xl:inline">{t('nav.admin')}</span></a>
           </>
         )}
