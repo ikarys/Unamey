@@ -1,4 +1,4 @@
-import { ArrowLeft, Eye, Loader, LogOut, Moon, Shield, Sun, User } from 'lucide-react';
+import { ArrowLeft, CircleHelp, Eye, Loader, LogOut, Moon, Shield, Sun, User } from 'lucide-react';
 import { VIEW_AS_KEY, type Me } from '../api';
 import { useApp } from './AppContext';
 import { LANGS, lang, setLang, t, tn, type Lang } from '../i18n';
@@ -83,6 +83,7 @@ export function TopBar({ current, onHelp, dark, onTheme }: { current: ScreenId; 
             <button onClick={signOut} title={t('nav.signOut')} aria-label={t('nav.signOut')} className="inline-flex items-center gap-1.5 hover:text-ink"><LogOut size={15} /><span className="hidden xl:inline">{t('nav.signOut')}</span></button>
           </>
         )}
+        <a href="https://ikarys.github.io/Unamey/help.html" target="_blank" rel="noreferrer" title={t('nav.help')} aria-label={t('nav.help')} className="inline-flex items-center gap-1.5 hover:text-ink"><CircleHelp size={15} /><span className="hidden xl:inline">{t('nav.help')}</span></a>
         {area === 'admin' && <button onClick={onHelp} title={t('nav.shortcutsTitle')} className="hover:text-ink">?</button>}
         <span className="relative inline-flex items-center">
           <Flag lang={lang} className="pointer-events-none absolute left-2.5" />

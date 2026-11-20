@@ -104,3 +104,22 @@ footer p{max-width:none}
 
 @media(max-width:40rem){.bar nav{order:3;width:100%;overflow-x:auto}.bar nav ul{flex-wrap:nowrap;white-space:nowrap}}
 @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.hero-in{animation:none}.btn{transition:none}}
+
+/* help page: a reading column with the section list beside it on wide screens */
+.doc-grid{display:grid;gap:2rem;padding-top:clamp(2rem,5vw,3.5rem);padding-bottom:clamp(3.5rem,8vw,6.5rem)}
+.doc-body{max-width:46rem}
+.doc-body h1{font-size:clamp(2.2rem,5vw,3.4rem)}
+.doc-body section{padding:0;margin-top:3rem}
+.doc-body h2{font-size:clamp(1.5rem,3vw,2rem);max-width:none;padding-top:1rem;border-top:1px solid var(--line)}
+.doc-body h3{font-size:1.15rem;margin-top:1.6rem}
+.doc-body li{margin-bottom:.4rem}
+.doc-body li p{margin:0}
+.toc p{font-family:var(--display);font-weight:700;margin-bottom:.4rem}
+.toc ol{list-style:none;margin:0;padding:0}
+.toc a{display:block;color:var(--muted);text-decoration:none;padding:.3rem 0}
+.toc a:hover{color:var(--accent)}
+.bar nav a[aria-current="page"]{color:#fff;font-weight:600}
+@media(min-width:56rem){
+  .doc-grid{grid-template-columns:13rem 1fr;gap:3.5rem}
+  .toc{position:sticky;top:5rem;align-self:start}
+}

@@ -33,6 +33,7 @@ export const en = {
   'nav.memberViewExit': 'Member view · exit',
   'nav.signOut': 'Sign out',
   'nav.shortcutsTitle': 'Keyboard shortcuts (?)',
+  'nav.help': 'Help',
   'nav.shortcuts': 'Keyboard shortcuts',
   'nav.lightMode': 'Light mode',
   'nav.darkMode': 'Dark mode',
