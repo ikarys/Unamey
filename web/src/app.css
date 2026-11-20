@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+/* One design system: the "soft product" look chosen from generation 90, light by default, `.dark` on <html>. */
+@theme {
+  --color-canvas: #F7F7FA;
+  --color-surface: #FFFFFF;
+  --color-raised: #F0F0F5;
+  --color-stage: #E4E4EB;
+  --color-line: #E4E4EC;
+  --color-line-strong: #D2D2DE;
+  --color-ink: #24242B;
+  --color-ink-2: #4E4E62;
+  --color-ink-3: #6A6A80;
+  --color-accent: #5B5BD6;
+  --color-accent-ink: #FFFFFF;
+  --color-ok: #1F9D63;
+  --color-warn: #B7791F;
+  --color-bad: #D64545;
+  --color-info: #2F7FD1;
+  --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+}
+
+:root { color-scheme: light; }
+.dark {
+  color-scheme: dark;
+  --color-canvas: #0B0B10; --color-surface: #13131A; --color-raised: #1B1B24; --color-stage: #060609;
+  --color-line: #25252F; --color-line-strong: #34343F;
+  --color-ink: #EEEEF4; --color-ink-2: #A0A0B2; --color-ink-3: #85859C;
+  --color-accent: #7C7CF0;
+  --color-ok: #7DD3A0; --color-warn: #F2C94C; --color-bad: #F07070; --color-info: #8CC7F0;
+}
+html, body, #root { height: 100%; }
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+:focus-visible { outline: 1px solid var(--color-accent); outline-offset: 1px; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--color-line-strong); }
+button, summary { cursor: pointer; }
+
+/* The stage behind previews sits darker than the chrome so the mockup reads as the object on it. */
+.dots { background-color: var(--color-stage); background-image: radial-gradient(color-mix(in oklab, var(--color-ink) 14%, transparent) 1px, transparent 1px); background-size: 16px 16px; }
+
+@keyframes pulse-soft { 50% { opacity: .5; } }
+.skeleton { background: var(--color-raised); border-radius: 6px; animation: pulse-soft 1.4s ease-in-out infinite; }
+
+@keyframes slide { from { left: -33%; } to { left: 100%; } }
+.indeterminate { animation: slide 1.4s ease-in-out infinite; }
+
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px); } }
+.fade-in { animation: fade-in .4s ease-out; }
+@media (prefers-reduced-motion: reduce) { .fade-in { animation: none; } }
+
+.shadow-soft { box-shadow: 0 4px 12px rgba(36, 36, 43, 0.08); }
+.shadow-accent { box-shadow: 0 2px 8px rgba(91, 91, 214, 0.3); }
+.dark .shadow-soft { box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4); }
+.dark .shadow-accent { box-shadow: 0 2px 8px rgba(124, 124, 240, 0.25); }

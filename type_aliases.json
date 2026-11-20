@@ -1,0 +1,8 @@
+{
+  "section-label": "section-header",
+  "widget-tile": "card",
+  "stat-strip": "kpi-tile",
+  "slider": "device-control",
+  "annotated-visualization": "chart",
+  "inspector": "side-panel"
+}

@@ -1,0 +1,7 @@
+[
+  {"id": "01a1f0a3-4e0f-73ef-9c33-4b153ca0f268", "edit": {"layout": "put the fault list in a right-hand column next to the map"}},
+  {"id": "01a1f088-aabc-769f-a214-05469f013d08", "edit": {"layout": "make the side panel narrower and put the KPI row at the top"}},
+  {"id": "01a1f064-efce-7601-807e-bf3c4db4941e", "edit": {"identity": {"density": "compact"}}},
+  {"id": "01a1f060-039a-7741-9a41-cb2e60475f28", "edit": {"identity": {"decoration": "none"}}},
+  {"id": "01a1f087-871e-76e5-89ba-10ef766f4fb0", "refine": "quieter"}
+]

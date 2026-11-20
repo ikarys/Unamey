@@ -1,0 +1,6 @@
+# rango CLI config: `rango makemigrations` scans src/models.rs, `rango migrate` applies migrations/ to $DATABASE_URL.
+[database]
+backend = "postgres"
+
+[models]
+src = "src/models.rs"
