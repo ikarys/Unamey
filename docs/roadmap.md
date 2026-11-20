@@ -117,3 +117,4 @@ SQLite is back, next to PostgreSQL this time: `DATABASE_URL` picks the backend a
 SQLite with no Docker; Postgres stays the deployment target and `just test` runs the suite on both. The SQL is
 written once in the common dialect (`src/sql.rs` holds the two spellings that differ: JSON paths and month buckets).
 No data moves between the two: a deployment that switches backends starts empty.
+SQLite transactions open with `BEGIN IMMEDIATE`, so two read-then-write transactions queue instead of one failing.

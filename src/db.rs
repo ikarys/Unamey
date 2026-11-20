@@ -1746,11 +1746,11 @@ mod tests {
         let cfg = test_cfg().await;
         // A kind of its own keeps this test apart from the other jobs of the shared test database.
         let kind = format!("k{}", Uuid::now_v7().simple());
-        for (status, cost) in [("done", Some(0.5)), ("failed", None), ("done", Some(2.0))] {
+        for (status, cost, age) in [("done", Some(0.5), 10), ("failed", None, 30), ("done", Some(2.0), 20)] {
             cfg.pool
                 .execute(
                     "INSERT INTO jobs (id, kind, status, owner_id, cost, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
-                    args![Uuid::now_v7(), &kind, status, LOCAL, cost, Utc::now()],
+                    args![Uuid::now_v7(), &kind, status, LOCAL, cost, Utc::now() - chrono::Duration::seconds(age)],
                 )
                 .await
                 .unwrap();
@@ -1767,7 +1767,8 @@ mod tests {
         let none = search_jobs(&cfg, &JobQuery::parse(&format!("q={kind}_nobody"))).await.unwrap();
         assert_eq!(none["total"], json!(0));
         let by_duration = search_jobs(&cfg, &JobQuery::parse(&format!("q={kind}&sort=duration"))).await.unwrap();
-        assert_eq!(by_duration["total"], json!(3), "unfinished jobs count up to now");
+        let costs: Vec<_> = by_duration["jobs"].as_array().unwrap().iter().map(|j| j["llm"]["cost"].clone()).collect();
+        assert_eq!(costs, vec![Value::Null, json!(2.0), json!(0.5)], "longest first; the unfinished job runs up to now: 30 s, 20 s, 10 s");
     }
 
     #[tokio::test]

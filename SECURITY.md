@@ -30,6 +30,7 @@ per-user job cap.
 | Credential storage | Passwords, sessions, API keys | argon2 password hashes, session and share tokens stored hashed, API keys sealed with the key file (`STUDIO_KEY_FILE`) via llm-providers-connector MasterKey; `db::tests::accounts_and_ownership` (login, password change revokes other sessions, only the session token hash is stored), `db::tests::share_links` (only the share token hash is stored) |
 | CSRF and DNS rebinding | HTTP API | Session cookie `HttpOnly SameSite=Lax`; in single-user mode `Host` and `Origin` must be `127.0.0.1` or `localhost` (`src/http.rs` local_origin); no test |
 | Brute force on login | Multi-user login | Not covered: no rate limiting yet (known gap) |
+| Lost update between two transactions that read then write (login session rotation, batch join) | `src/db.rs` transactions on SQLite | SQLite transactions open with `BEGIN IMMEDIATE`, so a second writer waits instead of committing in between and failing the first with `SQLITE_BUSY_SNAPSHOT`; `sql::tests::sqlite_transactions_take_the_write_lock_at_begin`. Postgres uses row locks |
 | Secrets in code | Repository | `gitleaks git` run by hand before each push; no CI yet |
 | Vulnerable dependencies | `Cargo.lock`, `web/package-lock.json` | `cargo audit` and `npm audit` run by hand before a release; no CI yet |
 

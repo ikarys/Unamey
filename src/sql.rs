@@ -128,7 +128,9 @@ impl Db {
     pub async fn begin(&self) -> Result<Tx, sqlx::Error> {
         Ok(match self {
             Db::Pg(p) => Tx::Pg(p.begin().await?),
-            Db::Sqlite { pool, .. } => Tx::Sqlite(pool.begin().await?),
+            // IMMEDIATE takes the write lock at BEGIN: a read-then-write transaction (login, join_batch) would otherwise
+            // fail with SQLITE_BUSY_SNAPSHOT when another writer commits in between; writers wait busy_timeout instead.
+            Db::Sqlite { pool, .. } => Tx::Sqlite(pool.begin_with("BEGIN IMMEDIATE").await?),
         })
     }
 
@@ -577,10 +579,10 @@ mod tests {
 
     #[test]
     fn both_migration_sets_describe_the_same_schema() {
-        // {table: [(column, nullable, primary_key)]} from each snapshot; col_type differs by backend on purpose
-        let shape = |path: &str| {
-            let v: serde_json::Value = serde_json::from_str(path).unwrap();
-            let mut map: std::collections::BTreeMap<String, Vec<(String, bool, bool)>> = std::collections::BTreeMap::new();
+        // {table: (columns as (name, nullable, primary_key), constraints as (name, definition))}; col_type differs by backend on purpose
+        type Shape = std::collections::BTreeMap<String, (Vec<(String, bool, bool)>, Vec<(String, String)>)>;
+        let shape = |v: &Value| -> Shape {
+            let mut map = Shape::new();
             for (table, obj) in v["tables"].as_object().unwrap() {
                 let mut cols = obj["columns"]
                     .as_array()
@@ -591,13 +593,47 @@ mod tests {
                     })
                     .collect::<Vec<_>>();
                 cols.sort();
-                map.insert(table.clone(), cols);
+                let mut cons = obj["constraints"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|c| (c["name"].as_str().unwrap().to_string(), c["definition"].as_str().unwrap().to_string()))
+                    .collect::<Vec<_>>();
+                cons.sort();
+                map.insert(table.clone(), (cols, cons));
             }
             map
         };
-        let pg = shape(include_str!("../migrations/snapshot.json"));
-        let lite = shape(include_str!("../migrations/sqlite/snapshot.json"));
-        assert_eq!(pg, lite);
+        // The snapshots do not list indexes: read the `CREATE INDEX IF NOT EXISTS "n" ON "t" ("c", ...)` lines of the
+        // migrations and keep those whose columns still exist (Postgres dropped two indexed columns in 0003).
+        let indexes = |files: &[&str], v: &Value| -> std::collections::BTreeSet<String> {
+            files
+                .iter()
+                .flat_map(|f| f.lines())
+                .filter(|l| l.starts_with("CREATE INDEX"))
+                .filter(|l| {
+                    let q: Vec<&str> = l.split('"').collect();
+                    let cols = v["tables"][q[3]]["columns"].as_array().unwrap();
+                    q[5..].iter().step_by(2).all(|c| cols.iter().any(|col| col["name"] == *c))
+                })
+                .map(str::to_string)
+                .collect()
+        };
+        let pg: Value = serde_json::from_str(include_str!("../migrations/snapshot.json")).unwrap();
+        let lite: Value = serde_json::from_str(include_str!("../migrations/sqlite/snapshot.json")).unwrap();
+        assert_eq!(shape(&pg), shape(&lite));
+        let pg_files = [
+            include_str!("../migrations/0001_auto.sql"),
+            include_str!("../migrations/0002_local_user.sql"),
+            include_str!("../migrations/0003_concepts_generations_projects_shares.sql"),
+            include_str!("../migrations/0004_jobs.sql"),
+            include_str!("../migrations/0005_users.sql"),
+            include_str!("../migrations/0006_jobs.sql"),
+        ];
+        let lite_files: Vec<&str> = SQLITE_MIGRATIONS.iter().map(|(_, sql)| *sql).collect();
+        let (pg_idx, lite_idx) = (indexes(&pg_files, &pg), indexes(&lite_files, &lite));
+        assert!(pg_idx.len() > 5, "the parser found the indexes");
+        assert_eq!(pg_idx, lite_idx);
     }
 
     #[cfg(unix)]
@@ -649,5 +685,32 @@ mod tests {
         assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
         assert!(restrict_mode("sqlite:///nonexistent/dir/x.db").is_err());
         assert!(restrict_mode("sqlite::memory:").is_ok());
+    }
+
+    /// Two transactions that read then write: with a deferred BEGIN the first one's write fails with SQLITE_BUSY_SNAPSHOT
+    /// once the second has committed; BEGIN IMMEDIATE makes the second wait (busy_timeout) for the first instead.
+    #[tokio::test]
+    async fn sqlite_transactions_take_the_write_lock_at_begin() {
+        if std::env::var("TEST_DATABASE_URL").is_ok() {
+            return;
+        }
+        let db = test_db().await;
+        let mut first = db.begin().await.unwrap();
+        first.fetch_one("SELECT COUNT(*) FROM users", vec![]).await.unwrap();
+        let other = db.clone();
+        let second = tokio::spawn(async move {
+            let mut tx = other.begin().await.unwrap();
+            tx.execute("INSERT INTO users (id, email, created_at) VALUES ($1, 'b@x.io', $2)", args![Uuid::new_v4(), Utc::now()])
+                .await
+                .unwrap();
+            tx.commit().await.unwrap();
+        });
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        first
+            .execute("INSERT INTO users (id, email, created_at) VALUES ($1, 'a@x.io', $2)", args![Uuid::new_v4(), Utc::now()])
+            .await
+            .unwrap();
+        first.commit().await.unwrap();
+        second.await.unwrap();
     }
 }
