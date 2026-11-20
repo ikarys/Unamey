@@ -5,6 +5,7 @@
 use crate::config::Config;
 use crate::db::{self, es};
 use crate::pipeline::tokens;
+use crate::sql::args;
 use serde_json::{Value, json};
 use std::path::PathBuf;
 use uuid::Uuid;
@@ -170,10 +171,15 @@ fn short(id: Uuid) -> String {
 /// Builds a generation pack in memory (no disk writes).
 pub fn generation(cfg: &Config, id: Uuid) -> Result<Pack, String> {
     let sql = "SELECT g.brief_json, g.notes_json, g.html, to_char(g.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), p.name, g.owner_id FROM generations g LEFT JOIN projects p ON p.id = g.project_id WHERE g.id = $1";
-    #[allow(clippy::type_complexity)]
-    let row: Option<(Value, Option<Value>, Option<String>, String, Option<String>, Uuid)> =
-        cfg.block(sqlx::query_as(sql).bind(id).fetch_optional(&cfg.pool)).map_err(es)?;
-    let (brief, notes, html, created_at, project, owner) = row.ok_or_else(|| format!("no generation #{id}"))?;
+    let row = cfg.block(cfg.pool.fetch_optional(sql, args![id])).map_err(es)?.ok_or_else(|| format!("no generation #{id}"))?;
+    let (brief, notes, html, created_at, project, owner) = (
+        row.get::<Value, _>(0),
+        row.get::<Option<Value>, _>(1),
+        row.get::<Option<String>, _>(2),
+        row.get::<String, _>(3),
+        row.get::<Option<String>, _>(4),
+        row.get::<Uuid, _>(5),
+    );
     let html = html.filter(|h| !h.is_empty()).ok_or("generation has no HTML")?;
     let notes = notes.unwrap_or_default();
     let md = skill_md(id, &brief, &notes, &created_at);
@@ -195,16 +201,14 @@ pub fn generation(cfg: &Config, id: Uuid) -> Result<Pack, String> {
 
 /// Builds a concept pack in memory (no disk writes).
 pub fn concept(cfg: &Config, concept: Uuid) -> Result<Pack, String> {
-    let (name, owner): (String, Uuid) = cfg
-        .block(
-            sqlx::query_as(
-                "SELECT p.name || '-' || c.name, p.owner_id FROM concepts c JOIN projects p ON p.id = c.project_id WHERE c.id = $1",
-            )
-            .bind(concept)
-            .fetch_optional(&cfg.pool),
-        )
+    let row = cfg
+        .block(cfg.pool.fetch_optional(
+            "SELECT p.name || '-' || c.name, p.owner_id FROM concepts c JOIN projects p ON p.id = c.project_id WHERE c.id = $1",
+            args![concept],
+        ))
         .map_err(es)?
         .ok_or_else(|| format!("no concept #{concept}"))?;
+    let (name, owner) = (row.get::<String, _>(0), row.get::<Uuid, _>(1));
     let identity = cfg.block(db::identity(cfg, concept))?.ok_or("the concept has no identity yet: pick a generation first")?;
     let html = identity["html"].as_str().filter(|h| !h.is_empty()).ok_or("the identity generation has no HTML")?;
     let id: Uuid = serde_json::from_value(identity["id"].clone()).map_err(es)?;

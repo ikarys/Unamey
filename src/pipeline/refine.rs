@@ -47,10 +47,8 @@ pub fn run(cfg: &Config, job: &Job, id: Uuid, request: Value) -> Result<Value, S
         Some(_) => return Err("mode: expected patch or full".into()),
     };
 
-    let parent = cfg
-        .block(get::<_, models::Generation>(&cfg.pool, &SqlValue::Uuid(id)))
-        .map_err(es)?
-        .ok_or_else(|| format!("no generation #{id}"))?;
+    let parent =
+        cfg.block(cfg.pool.get::<models::Generation>(&SqlValue::Uuid(id))).map_err(es)?.ok_or_else(|| format!("no generation #{id}"))?;
     let html = parent.html.map(|h| h.0).filter(|h| !h.is_empty()).ok_or("generation has no HTML")?;
     let brief = parent.brief_json.0;
     let parent_notes = parent.notes_json.map(|n| n.0).unwrap_or_default();

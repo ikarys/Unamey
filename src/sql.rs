@@ -317,6 +317,11 @@ macro_rules! arg_from {
 }
 arg_from!(String => NullText, bool => NullBool, i32 => NullInt, i64 => NullBigInt, f64 => NullDouble, Uuid => NullUuid, DateTime<Utc> => NullDateTime, Value => NullJson);
 
+impl Arg for &String {
+    fn arg(self) -> SqlValue {
+        SqlValue::from(self.as_str())
+    }
+}
 impl Arg for &str {
     fn arg(self) -> SqlValue {
         SqlValue::from(self)
@@ -364,6 +369,21 @@ pub async fn migrate_sqlite(pool: &rango::SqlitePool) -> Result<(), String> {
     Ok(())
 }
 
+/// Makes the SQLite file private (0600): it holds password hashes, session token hashes and the sealed provider keys.
+/// The WAL side files inherit the directory's mode. Called after `connect`, which creates the file.
+pub fn restrict_mode(url: &str) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let path = url.trim_start_matches("sqlite://").trim_start_matches("sqlite:");
+        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
+            eprintln!("warning: cannot restrict {path}: {e}");
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = url;
+}
+
 #[cfg(test)]
 pub struct TempDb(pub std::path::PathBuf);
 
@@ -392,22 +412,76 @@ pub async fn test_db() -> Db {
     }
     let path = std::env::temp_dir().join(format!("unamey-test-{}.db", Uuid::new_v4().simple()));
     let tmp = std::sync::Arc::new(TempDb(path.clone()));
-    let Db::Sqlite { pool, .. } = Db::connect(&format!("sqlite://{}", path.display())).await.expect("open the test database") else {
-        unreachable!()
-    };
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("restrict the test database file");
-    }
+    let url = format!("sqlite://{}", path.display());
+    let Db::Sqlite { pool, .. } = Db::connect(&url).await.expect("open the test database") else { unreachable!() };
+    restrict_mode(&url);
     migrate_sqlite(&pool).await.expect("migrate the test database");
     Db::Sqlite { pool, tmp: Some(tmp) }
 }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::models::{Generation, Project, User};
     use chrono::TimeZone;
+    use rango::{FieldDateTime, FieldJson, FieldText, FieldUuid, ForeignKey};
     use serde_json::json;
+
+    const LOCAL: Uuid = Uuid::from_u128(1);
+
+    fn generation(owner: Uuid, project: Option<Uuid>) -> Generation {
+        Generation {
+            id: FieldUuid(Uuid::new_v4()),
+            brief_json: FieldJson(serde_json::json!({})),
+            model: FieldText("m".into()),
+            notes_json: None,
+            html: None,
+            skill_version: FieldText("v".into()),
+            verdict: None,
+            verdict_note: None,
+            created_at: FieldDateTime(Utc::now()),
+            project_id: project.map(ForeignKey::new),
+            concept_id: None,
+            page: None,
+            target: FieldText("desktop".into()),
+            owner_id: ForeignKey::new(owner),
+        }
+    }
+
+    #[tokio::test]
+    async fn schema_seeds_local_and_enforces_relations() {
+        let db = test_db().await;
+        let local = db.get::<User>(&SqlValue::Uuid(LOCAL)).await.unwrap().expect("local user seeded");
+        assert!(local.admin.0);
+
+        let pid = Uuid::new_v4();
+        let project = Project {
+            id: FieldUuid(pid),
+            name: FieldText("p".into()),
+            owner_id: ForeignKey::new(LOCAL),
+            created_at: FieldDateTime(Utc::now()),
+            archived_at: None,
+        };
+        db.insert(project).await.unwrap();
+        let g = db.insert(generation(LOCAL, Some(pid))).await.unwrap();
+
+        // A generation with a bad target, or a second project with the same name, is refused.
+        let mut bad = generation(LOCAL, None);
+        bad.target = FieldText("tv".into());
+        assert!(db.insert(bad).await.is_err());
+        let dup = Project {
+            id: FieldUuid(Uuid::new_v4()),
+            name: FieldText("p".into()),
+            owner_id: ForeignKey::new(LOCAL),
+            created_at: FieldDateTime(Utc::now()),
+            archived_at: None,
+        };
+        assert!(db.insert(dup).await.is_err());
+
+        // Deleting the project keeps its generation (project_id set to NULL).
+        db.execute("DELETE FROM projects WHERE id = $1", args![pid]).await.unwrap();
+        let kept = db.get::<Generation>(&SqlValue::Uuid(g.id.0)).await.unwrap().expect("generation kept");
+        assert!(kept.project_id.is_none());
+    }
 
     #[tokio::test]
     async fn round_trip_binds_like_rango() {
@@ -518,5 +592,17 @@ mod tests {
         let pg = shape(include_str!("../migrations/snapshot.json"));
         let lite = shape(include_str!("../migrations/sqlite/snapshot.json"));
         assert_eq!(pg, lite);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn sqlite_file_is_private() {
+        if std::env::var("TEST_DATABASE_URL").is_ok() {
+            return;
+        }
+        use std::os::unix::fs::PermissionsExt;
+        let db = test_db().await;
+        let Db::Sqlite { tmp: Some(tmp), .. } = &db else { unreachable!() };
+        assert_eq!(std::fs::metadata(&tmp.0).unwrap().permissions().mode() & 0o777, 0o600);
     }
 }

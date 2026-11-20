@@ -792,7 +792,7 @@ mod tests {
     use super::*;
 
     async fn test_cfg() -> Arc<Config> {
-        let mut cfg = Config::new(crate::pg::test_pool().await, tokio::runtime::Handle::current(), 0);
+        let mut cfg = Config::new(crate::sql::test_db().await, tokio::runtime::Handle::current(), 0);
         cfg.key_file = std::env::temp_dir().join(format!("studio-test-{}.key", Uuid::new_v4().simple()));
         Arc::new(cfg)
     }
@@ -811,9 +811,15 @@ mod tests {
         let cfg = test_cfg().await;
 
         let alice = Uuid::now_v7();
-        sqlx::query("INSERT INTO users (id, email) VALUES ($1, 'a@x.io')").bind(alice).execute(&cfg.pool).await.unwrap();
+        cfg.pool
+            .execute("INSERT INTO users (id, email, created_at) VALUES ($1, 'a@x.io', $2)", crate::sql::args![alice, chrono::Utc::now()])
+            .await
+            .unwrap();
         let bob = Uuid::now_v7();
-        sqlx::query("INSERT INTO users (id, email) VALUES ($1, 'b@x.io')").bind(bob).execute(&cfg.pool).await.unwrap();
+        cfg.pool
+            .execute("INSERT INTO users (id, email, created_at) VALUES ($1, 'b@x.io', $2)", crate::sql::args![bob, chrono::Utc::now()])
+            .await
+            .unwrap();
 
         let a = Actor { id: alice, admin: false };
         let b = Actor { id: bob, admin: false };

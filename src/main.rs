@@ -6,7 +6,6 @@ mod http;
 mod jobs;
 mod llm;
 mod models;
-mod pg;
 mod pipeline;
 mod share;
 mod sql;
@@ -15,7 +14,7 @@ use std::sync::Arc;
 
 fn usage() -> ! {
     eprintln!(
-        "usage: studio serve [--port 7700]   (DATABASE_URL must point at a migrated Postgres; PORT and STUDIO_BIND also set the address)"
+        "usage: studio serve [--port 7700]   (DATABASE_URL: a PostgreSQL URL, or unset for sqlite://studio.db; PORT and STUDIO_BIND also set the address)"
     );
     std::process::exit(2);
 }
@@ -42,7 +41,13 @@ async fn main() {
 }
 
 async fn start(port: u16) -> Result<(), String> {
-    let cfg = Arc::new(config::Config::new(pg::connect().await?, tokio::runtime::Handle::current(), port));
+    let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://studio.db".into());
+    let pool = sql::Db::connect(&url).await?;
+    if let sql::Db::Sqlite { pool: p, .. } = &pool {
+        sql::migrate_sqlite(p).await?;
+        sql::restrict_mode(&url);
+    }
+    let cfg = Arc::new(config::Config::new(pool, tokio::runtime::Handle::current(), port));
     db::load_llm_settings(&cfg).await?;
     // Bind before mark_stale: a second instance that cannot bind must not fail the first one's jobs.
     let listener = http::bind(&cfg).await?;
