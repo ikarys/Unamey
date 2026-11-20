@@ -13,10 +13,11 @@ processes:
 convention:
   version: "0.1"
   level: 1
-  adopted_at: 84cbdcf11f728a7c4b35b3f6c66ec96d722a2baf
+  adopted_at: 156515e6c6f20022531cd6b264b1ae2d7e96bede
   status: active
   tools:
-    - "Claude Code:claude-opus-5-5"
+    - "Claude Code:claude-fable-5-1"
+    - "Claude Code:claude-sonnet-5-5"
     - "local:qwen3.8-27b"
   attribution_trailers: [Assisted-by]
   agent_instruction_files: [AGENTS.md]
@@ -39,9 +40,9 @@ This project follows the [Vibecoding Convention](https://github.com/ikarys/vibec
 
 ## AI assistance
 
-Claude Code frames the work, writes briefs, writes code and reviews; a local
-model (qwen3.8-27b) writes part of the code and documentation from those
-briefs. The maintainer decides the scope, tries the product by hand and reads
+Claude Code (Fable, Sonnet; Opus for the initial squashed commit) frames the work, writes briefs, writes code
+and reviews; a local model (qwen3.8-27b) writes part of the code and
+documentation from those briefs. The maintainer decides the scope, tries the product by hand and reads
 every change before it reaches `main`. Nearly all of the code is AI-written.
 
 ## Review
