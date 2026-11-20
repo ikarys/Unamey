@@ -37,7 +37,7 @@ export function TopBar({ current, onHelp, dark, onTheme }: { current: ScreenId; 
   const screens = navScreens(me).filter((s) => s.area === area);
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 whitespace-nowrap border-b border-line bg-canvas px-4 text-[14px] lg:gap-8 lg:px-6">
-      <a href="#/" title={t('nav.home')} className="text-[15px] font-bold tracking-tight text-ink hover:text-accent">Unamey</a>
+      <a href="#/" title={t('nav.home')} className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-ink hover:text-accent"><img src="/icon-192.png" width="22" height="22" alt="" className="h-[22px] w-[22px] rounded" />Unamey</a>
       {area === 'admin' && <span className="-ml-2 lg:-ml-5 rounded-full bg-raised px-2 py-0.5 text-[12px] font-semibold text-accent">{t('nav.admin')}</span>}
       <nav aria-label={t('nav.main')} className="flex h-full gap-6">
         {screens.map(({ id, label }, i) => (

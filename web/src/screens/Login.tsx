@@ -23,7 +23,7 @@ export function Login({ onDone }: { onDone: () => void }) {
   return (
     <div className="flex h-full items-center justify-center">
       <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="w-[360px] rounded border border-line bg-surface p-5">
-        <h1 className="mb-1 font-mono text-xs font-medium tracking-wider">AI·UI·MOCKUP</h1>
+        <h1 className="mb-1 flex items-center gap-2 text-[15px] font-bold tracking-tight text-ink"><img src="/icon-192.png" width="22" height="22" alt="" className="h-[22px] w-[22px] rounded" />Unamey</h1>
         <p className="mb-4 text-[12px] text-ink-2">{mode === 'signin' ? t('login.signInSubtitle') : t('login.createAccountSubtitle')}</p>
         {mode === 'signup' && (
           <div className="mb-3">
