@@ -1,0 +1,6 @@
+# rango CLI config for the SQLite migration set: `just makemigrations-sqlite` runs `rango makemigrations --output . ../../src` here.
+[database]
+backend = "sqlite"
+
+[models]
+src = "../../src/models.rs"

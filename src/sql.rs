@@ -333,6 +333,37 @@ macro_rules! args {
 }
 pub(crate) use args;
 
+/// The SQLite migration set, embedded so a developer needs no CLI; names are the file stems the rango CLI records.
+const SQLITE_MIGRATIONS: &[(&str, &str)] = &[
+    ("0001_auto", include_str!("../migrations/sqlite/0001_auto.sql")),
+    ("0002_local_user", include_str!("../migrations/sqlite/0002_local_user.sql")),
+];
+
+/// Applies the pending SQLite migrations, recorded in the same `_rango_migrations` table the rango CLI uses, one transaction per file.
+pub async fn migrate_sqlite(pool: &rango::SqlitePool) -> Result<(), String> {
+    sqlx::query("CREATE TABLE IF NOT EXISTS _rango_migrations (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, applied_at TEXT NOT NULL DEFAULT (datetime('now')))").execute(pool).await.map_err(|e| format!("migrations table: {e}"))?;
+    let applied: std::collections::HashSet<String> = sqlx::query_scalar::<_, String>("SELECT name FROM _rango_migrations")
+        .fetch_all(pool)
+        .await
+        .map_err(|e| format!("migrations table: {e}"))?
+        .into_iter()
+        .collect();
+    for (name, sql) in SQLITE_MIGRATIONS {
+        if applied.contains(*name) {
+            continue;
+        }
+        let mut tx = pool.begin().await.map_err(|e| format!("migration {name}: {e}"))?;
+        sqlx::raw_sql(sql).execute(&mut *tx).await.map_err(|e| format!("migration {name}: {e}"))?;
+        sqlx::query("INSERT INTO _rango_migrations (name) VALUES (?)")
+            .bind(name)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| format!("migration {name}: {e}"))?;
+        tx.commit().await.map_err(|e| format!("migration {name}: {e}"))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 pub struct TempDb(pub std::path::PathBuf);
 
@@ -369,6 +400,7 @@ pub async fn test_db() -> Db {
         use std::os::unix::fs::PermissionsExt;
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("restrict the test database file");
     }
+    migrate_sqlite(&pool).await.expect("migrate the test database");
     Db::Sqlite { pool, tmp: Some(tmp) }
 }
 #[cfg(test)]
@@ -447,5 +479,44 @@ mod tests {
     async fn unknown_scheme_is_refused() {
         let e = Db::connect("mysql://u:p@h/db").await.err().unwrap();
         assert!(e.contains("unsupported") && e.contains("mysql") && !e.contains("u:p"), "{e}");
+    }
+
+    #[tokio::test]
+    async fn sqlite_migrations_apply_once_and_seed_local() {
+        if std::env::var("TEST_DATABASE_URL").is_ok() {
+            return;
+        }
+        let db = test_db().await; // migrated by test_db
+        let Db::Sqlite { pool, .. } = &db else { unreachable!() };
+        migrate_sqlite(pool).await.unwrap(); // second run: nothing pending, no error
+        let n: i64 = db.fetch_one("SELECT COUNT(*) FROM _rango_migrations", vec![]).await.unwrap().get(0);
+        assert_eq!(n as usize, SQLITE_MIGRATIONS.len());
+        let local: crate::models::User = db.get(&SqlValue::Uuid(Uuid::from_u128(1))).await.unwrap().expect("local user seeded");
+        assert!(local.admin.0);
+    }
+
+    #[test]
+    fn both_migration_sets_describe_the_same_schema() {
+        // {table: [(column, nullable, primary_key)]} from each snapshot; col_type differs by backend on purpose
+        let shape = |path: &str| {
+            let v: serde_json::Value = serde_json::from_str(path).unwrap();
+            let mut map: std::collections::BTreeMap<String, Vec<(String, bool, bool)>> = std::collections::BTreeMap::new();
+            for (table, obj) in v["tables"].as_object().unwrap() {
+                let mut cols = obj["columns"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|c| {
+                        (c["name"].as_str().unwrap().to_string(), c["nullable"].as_bool().unwrap(), c["primary_key"].as_bool().unwrap())
+                    })
+                    .collect::<Vec<_>>();
+                cols.sort();
+                map.insert(table.clone(), cols);
+            }
+            map
+        };
+        let pg = shape(include_str!("../migrations/snapshot.json"));
+        let lite = shape(include_str!("../migrations/sqlite/snapshot.json"));
+        assert_eq!(pg, lite);
     }
 }

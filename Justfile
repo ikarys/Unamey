@@ -55,6 +55,10 @@ db:
 makemigrations:
     rango makemigrations
 
+# Same, for the SQLite set (commit it with its snapshot.json); the two snapshots are compared by a test.
+makemigrations-sqlite:
+    cd migrations/sqlite && rango makemigrations --output . ../../src
+
 # Rust tests run against a fresh copy of the migrated `studio_test` database each (pg::test_pool).
 test:
     echo "SELECT format('DROP DATABASE %I', datname) FROM pg_database WHERE datname LIKE 'studio_test%' \\gexec" | {{psql}}
