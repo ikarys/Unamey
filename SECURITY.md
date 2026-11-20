@@ -38,7 +38,7 @@ per-user job cap.
 | Claim | Test |
 |---|---|
 | Model tool calls are confined when reading skill files | `pipeline::generate::tests::confinement` |
-| The SQLite database file is readable by the server's user only (mode 0600 set at startup before the first write; SQLite gives the WAL and shm side files the main file's mode, and startup also fixes side files already there) | `sql::tests::sqlite_file_is_private` |
+| The SQLite database file is readable by the server's user only (mode 0600 set at startup before the first write, with the URL's query string such as `?mode=rwc` ignored; SQLite gives the WAL and shm side files the main file's mode, and startup also fixes side files already there; startup fails if the file cannot be restricted) | `sql::tests::sqlite_file_is_private`, `sql::tests::sqlite_side_files_are_private`, `sql::tests::sqlite_query_string_url_is_restricted` |
 | Only the owner reaches a project, concept, generation or job, admins included; another user gets 404 on every owned route | `authz::tests::access`, `http::tests::other_users_get_404_on_owned_routes`, `db::tests::accounts_and_ownership`, `db::tests::status_shows_only_the_actors_jobs` |
 | Members get 403 on admin-only API prefixes; admin view as member drops rights | `authz::tests::member_uses`, `authz::tests::admin_uses`, `authz::tests::view_as_member_only_drops_rights` |
 | Static files never leave `web/dist` | `http::tests::static_paths_never_leave_the_root` |

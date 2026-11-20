@@ -365,22 +365,29 @@ pub async fn migrate_sqlite(pool: &rango::SqlitePool) -> Result<(), String> {
 /// Makes the SQLite file private (0600): it holds password hashes, session token hashes and the sealed provider keys.
 /// SQLite gives the WAL and shm side files the main file's mode when it creates them, so this runs right after
 /// `connect` (which creates the file) and before the first write; side files already there are fixed too.
-pub fn restrict_mode(url: &str) {
+/// The query string (`?mode=rwc`) is not part of the file name. Failing on the main file stops the server:
+/// a warning would leave a world-readable database behind.
+pub fn restrict_mode(url: &str) -> Result<(), String> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let path = url.trim_start_matches("sqlite://").trim_start_matches("sqlite:");
+        let path = path.split('?').next().unwrap_or(path);
+        if path == ":memory:" {
+            return Ok(());
+        }
         for suffix in ["", "-wal", "-shm"] {
             let file = format!("{path}{suffix}");
             match std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)) {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound && !suffix.is_empty() => {}
-                Err(e) => eprintln!("warning: cannot restrict {file}: {e}"),
+                Err(e) => return Err(format!("cannot restrict {file}: {e}")),
             }
         }
     }
     #[cfg(not(unix))]
     let _ = url;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -413,7 +420,7 @@ pub async fn test_db() -> Db {
     let tmp = std::sync::Arc::new(TempDb(path.clone()));
     let url = format!("sqlite://{}", path.display());
     let Db::Sqlite { pool, .. } = Db::connect(&url).await.expect("open the test database") else { unreachable!() };
-    restrict_mode(&url);
+    restrict_mode(&url).expect("restrict the test database");
     migrate_sqlite(&pool).await.expect("migrate the test database");
     Db::Sqlite { pool, tmp: Some(tmp) }
 }
@@ -618,11 +625,29 @@ mod tests {
         let url = format!("sqlite://{}", path.display());
         let Db::Sqlite { pool, .. } = Db::connect(&url).await.unwrap() else { unreachable!() };
         migrate_sqlite(&pool).await.unwrap();
-        restrict_mode(&url);
+        restrict_mode(&url).unwrap();
         for suffix in ["", "-wal", "-shm"] {
             let mut p = path.clone().into_os_string();
             p.push(suffix);
             assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600, "{suffix:?}");
         }
+    }
+
+    /// A query string (`?mode=rwc`) is not part of the file name; a file that cannot be restricted must stop the server.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn sqlite_query_string_url_is_restricted() {
+        if std::env::var("TEST_DATABASE_URL").is_ok() {
+            return;
+        }
+        use std::os::unix::fs::PermissionsExt;
+        let path = std::env::temp_dir().join(format!("unamey-test-{}.db", Uuid::new_v4().simple()));
+        let _tmp = TempDb(path.clone());
+        let url = format!("sqlite://{}?mode=rwc", path.display());
+        let Db::Sqlite { .. } = Db::connect(&url).await.unwrap() else { unreachable!() };
+        restrict_mode(&url).unwrap();
+        assert_eq!(std::fs::metadata(&path).unwrap().permissions().mode() & 0o777, 0o600);
+        assert!(restrict_mode("sqlite:///nonexistent/dir/x.db").is_err());
+        assert!(restrict_mode("sqlite::memory:").is_ok());
     }
 }

@@ -44,7 +44,7 @@ async fn start(port: u16) -> Result<(), String> {
     let url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "sqlite://studio.db".into());
     let pool = sql::Db::connect(&url).await?;
     if let sql::Db::Sqlite { pool: p, .. } = &pool {
-        sql::restrict_mode(&url);
+        sql::restrict_mode(&url)?;
         sql::migrate_sqlite(p).await?;
     }
     let cfg = Arc::new(config::Config::new(pool, tokio::runtime::Handle::current(), port));
