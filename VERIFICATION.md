@@ -22,5 +22,5 @@ follows Vibecoding Convention level 1
 
 - No CI yet. Checks run by hand before each merge.
 - No coverage measurement.
-- No blind usability test yet. It is planned before the first release.
+- No blind usability test yet. Release 0.1.0 ships without one; it is planned for the next minor.
 - Generated design quality depends on the model used.
