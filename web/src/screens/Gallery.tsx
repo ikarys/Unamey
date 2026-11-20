@@ -4,6 +4,7 @@ import { Archive, ArchiveRestore, Loader, Pencil, Smartphone, Sparkles, SquareCh
 import { api, shortId, type Generation } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import { Dot, ErrorRow, confirmDialog } from '../components/ui';
+import { HelpButton } from '../components/Help';
 import { previewDoc } from './Generate';
 import { useApp } from '../components/AppContext';
 import { fmtAgo, t, tn, type Key } from '../i18n';
@@ -311,8 +312,8 @@ export function Gallery() {
   const head = (
     <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
       <div>
-        <h1 className="text-[28px] font-bold tracking-tight text-ink">
-          {t('gallery.title')} <span className="text-ink-3">{data?.length ?? 0}</span>
+        <h1 className="flex items-center gap-2 text-[28px] font-bold tracking-tight text-ink">
+          {t('gallery.title')} <span className="text-ink-3">{data?.length ?? 0}</span> <HelpButton section="gallery" />
         </h1>
         <p className="mt-1 text-[14px] text-ink-2">{t('gallery.subtitle')}</p>
       </div>

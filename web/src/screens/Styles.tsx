@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { api, type Archetype } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import { ErrorRow, ImageZoom } from '../components/ui';
+import { HelpButton } from '../components/Help';
 import { t, look } from '../i18n';
 
 function Example({ id, name, onZoom }: { id: string; name: string; onZoom: () => void }) {
@@ -43,7 +44,7 @@ export function Styles() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-5xl px-8 py-10">
-        <h1 className="text-[28px] font-bold tracking-tight text-ink">{t('styles.title')}</h1>
+        <h1 className="flex items-center gap-2 text-[28px] font-bold tracking-tight text-ink">{t('styles.title')} <HelpButton section="styles" /></h1>
         <p className="mt-1 max-w-2xl text-[14px] text-ink-2">{t('styles.subtitle')}</p>
         {error && <div className="mt-6"><ErrorRow message={error} onRetry={reload} /></div>}
         {groups.map(([title, sub, list]) => list.length > 0 && (

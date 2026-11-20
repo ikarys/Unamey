@@ -4,6 +4,7 @@ import { api, shortId, REFINE_ACTIONS, REFINE_HINTS, type Archetype, type BriefD
 import { useAsync } from '../hooks/useAsync';
 import { useJob } from '../hooks/useJob';
 import { useApp } from '../components/AppContext';
+import { HelpButton } from '../components/Help';
 import { Button, Dot, useDismiss, EmptyState, ErrorRow, Hint, Label, Segmented, SkeletonRows, confirmDialog, areaCls, inputCls, labelCls, linkCls, rowCls } from '../components/ui';
 import { ProjectNav, ProjectBar, NameSelect } from '../components/ProjectNav';
 import { PromptBox } from '../components/PromptBox';
@@ -754,6 +755,7 @@ function Result({ id, counterpart, onMakeCounterpart, onVerdict, siblings, compa
           {nav ? <div className="min-w-0 flex-1">{nav}</div> : (
             <span className="min-w-0 flex-1 truncate text-[14px] font-semibold">{g.page?.trim() || t('projectNav.mainScreen')}{me.admin && <span className="ml-2 font-normal text-ink-3">{g.label ?? (g.notes as { direction?: { label?: string } } | null)?.direction?.label ?? `#${shortId(g.id)}`}</span>}</span>
           )}
+          <HelpButton section="rework" className="shrink-0" />
           {comparePool.length > 1 && (
             <Button className="h-8" primary={compare} aria-pressed={compare} onClick={() => setCompare(!compare)} title={t('result.compareSide')}><Columns3 size={16} /> {t('result.compareSide')}</Button>
           )}
