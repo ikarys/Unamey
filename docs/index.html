@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unamey: pick the look, then let the agent code</title>
+<meta name="description" content="Unamey is an open-source mockup studio for apps built with coding agents. Choose the styles before anything is generated, compare several looks as real HTML screens, rework them, keep one look across every page, and hand the agent a pack of files.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Unamey: a mockup studio for apps built with coding agents">
+<meta property="og:description" content="Several looks to compare, rework on the mockup, one look across every page, the decision handed to the agent as files.">
+<meta property="og:url" content="https://ikarys.github.io/Unamey/">
+<meta property="og:image" content="https://ikarys.github.io/Unamey/screenshots/looks.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" type="image/png" sizes="32x32" href="logo/icon-32.png">
+<link rel="icon" type="image/png" sizes="192x192" href="logo/icon-192.png">
+<link rel="apple-touch-icon" href="logo/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&family=Figtree:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="site.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header">
+  <div class="wrap bar">
+    <a class="brand" href="#top"><img src="logo/icon-192.png" width="28" height="28" alt="">Unamey</a>
+    <nav aria-label="Main">
+      <ul>
+        <li><a href="#why">Why</a></li>
+        <li><a href="#workflow">Workflow</a></li>
+        <li><a href="#styles">Styles</a></li>
+        <li><a href="#pack">Pack</a></li>
+        <li><a href="#run">Run</a></li>
+        <li><a href="help.html">Help</a></li>
+      </ul>
+    </nav>
+    <a class="gh" href="https://github.com/ikarys/Unamey">GitHub</a>
+  </div>
+</header>
+
+<main id="main">
+<section class="hero" id="top">
+  <div class="wrap hero-in">
+    <div class="hero-grid">
+      <div>
+        <h1>Pick the look. Then let the agent code.</h1>
+        <p class="lead">Describe your product, choose the styles you want to see among sixteen, and minutes later compare real HTML screens of it side by side. Rework, pick one, and hand your coding agent a pack of files to build from.</p>
+        <div class="cta">
+          <a class="btn primary" href="#run">Get started</a>
+          <a class="btn ghost" href="https://github.com/ikarys/Unamey">View on GitHub</a>
+        </div>
+      </div>
+      <img class="logo" src="logo/unamey-800.png" width="800" height="800" alt="Unamey logo: a chameleon curled on itself, in teal, blue and orange.">
+    </div>
+    <figure class="frame">
+      <img src="screenshots/home.png" width="1440" height="900" alt="Unamey home screen: a text box to describe the product, and a choice of design styles below it.">
+    </figure>
+  </div>
+</section>
+
+<section id="why">
+  <div class="wrap">
+    <h2>With an agent, you discover the design at the end. Here, you choose it at the start.</h2>
+    <div class="verdict">
+      <p>Ask a coding agent for a screen and you get one answer, after the code is written. Every change is another prompt, another round. Unamey turns that around: sixteen styles to pick from, real HTML previews from the first minute, several looks of your product side by side. You compare, you rework, you decide. The agent starts once the look is settled.</p>
+    </div>
+    <h3>What you get</h3>
+    <ul class="gives">
+      <li><strong>Styles chosen up front</strong><span>Sixteen styles with previews. Pick the ones you want to see before anything is generated: a Swiss grid, a bento board, a dense console of the same product.</span></li>
+      <li><strong>Previews from the first minute</strong><span>Every screen is a real HTML page you can open, zoom and compare. No waiting for the build to see what you will get.</span></li>
+      <li><strong>Rework without touching code</strong><span>Colours, fonts, radius, density, layout. Bolder, quieter, another style. Each try is a new screen next to the previous ones.</span></li>
+      <li><strong>One look across the whole app</strong><span>Every further page, desktop and mobile, is generated on the chosen shell and tokens. The consistency agents lose, kept.</span></li>
+      <li><strong>Runs on your machine</strong><span>A local 27B model is enough. An API provider only makes it faster.</span></li>
+    </ul>
+    <p class="note">Fair warning: a strong agent such as Claude Code with Opus already draws a clean one-shot screen, and our pack did not make that single screen better (<a href="https://github.com/ikarys/Unamey/blob/main/docs/reports/2026-11-19-agent-comparison.md">comparison report</a>). The gain is the choice and the consistency, not a prettier single screen. Whether that saves correction rounds on a real multi-screen project is the measurement in progress.</p>
+  </div>
+</section>
+
+<section id="workflow" class="alt">
+  <div class="wrap">
+    <h2>From a brief to a pack, in six steps.</h2>
+    <ol class="steps">
+      <li class="step plain"><div class="txt">
+        <h3>Brief</h3>
+        <p>Type a description and pick the styles you want to see, one or several of the sixteen, or let the planner propose them. One model call expands your words into a brief (users, data objects, main task, density, suggested pages) that you review. Your own words stay binding: the expansion cannot narrow the scope, rename the product or drop a colour you asked for.</p>
+      </div></li>
+      <li class="step plain"><div class="txt">
+        <h3>Plan</h3>
+        <p>For each variant, a planner picks one of 16 named structures (master list and detail, board, timeline, dashboard, step flow, live console, record page, catalog) and one of 16 styles, different across variants. Every object the brief names gets a visible region.</p>
+      </div></li>
+      <li class="step has"><div class="txt">
+        <h3>Draw</h3>
+        <p>The model writes a standalone HTML page (Tailwind CDN, inline SVG icons) that follows the direction and a layout vocabulary. You get several looks of the same product to explore, then set one as the project's look. The right column adjusts the tokens live.</p>
+      </div>
+      <figure class="shot"><img src="screenshots/looks.png" width="1440" height="900" loading="lazy" alt="Three looks of a padel club app side by side, with the brief on the left and live token controls on the right."><figcaption>Three looks of a padel club app.</figcaption></figure></li>
+      <li class="step has"><div class="txt">
+        <h3>Rework</h3>
+        <p>Give a verdict (good, mixed, bad), refine along one action (bolder, quieter, distill, typeset, colorize, layout), add a variant in another style, edit tokens or give a layout-only instruction. Every result is a new screen next to the previous ones, and you can compare two at the same zoom.</p>
+      </div>
+      <figure class="shot"><img src="screenshots/compare.png" width="1440" height="900" loading="lazy" alt="Two screens compared side by side at the same zoom."><figcaption>Compare two screens, panning both at once.</figcaption></figure></li>
+      <li class="step has"><div class="txt">
+        <h3>Pages</h3>
+        <p>Set a screen as the project's look, then type page names. Each page is generated on that look, as desktop, mobile or both. Mobile pages are their own screens: 390 px, a bottom tab bar, 44 px targets.</p>
+      </div>
+      <figure class="shot"><img src="screenshots/pages.png" width="1440" height="900" loading="lazy" alt="The pages of a project, all generated on one look with the same shell and navigation."><figcaption>Pages of a project on one look.</figcaption></figure>
+      <figure class="shot"><img src="screenshots/mobile.png" width="1440" height="900" loading="lazy" alt="A mobile page shown inside a phone frame."><figcaption>A mobile page in a phone frame.</figcaption></figure></li>
+      <li class="step has"><div class="txt">
+        <h3>Pack</h3>
+        <p>Export the project pack and copy it into the app you are building. The gallery keeps every screen, grouped by project and filterable by verdict, style or text. Read-only share links let someone see a screen without an account.</p>
+      </div>
+      <figure class="shot"><img src="screenshots/gallery.png" width="1440" height="900" loading="lazy" alt="The gallery listing every generated screen, grouped by project with filters."><figcaption>The gallery keeps every screen.</figcaption></figure></li>
+    </ol>
+  </div>
+</section>
+
+<section id="styles">
+  <div class="wrap">
+    <h2>Sixteen styles, each with its own rules.</h2>
+    <p>Every style comes with a layout, neutrals, hues, fonts and do and don't rules. Pick one yourself, or let the planner propose three.</p>
+    <figure class="frame">
+      <img src="screenshots/styles.png" width="1440" height="1010" loading="lazy" alt="The sixteen design styles shown as a grid of cards, each with a palette and font sample.">
+    </figure>
+  </div>
+</section>
+
+<section id="samples" class="alt">
+  <div class="wrap">
+    <h2>Generated pages, as they come out.</h2>
+    <p>Local model, one shot, no retouch.</p>
+    <div class="grid2">
+      <figure class="shot"><img src="screenshots/sample-editorial.png" width="1440" height="900" loading="lazy" alt="An editorial style page for a notes app."><figcaption>Editorial, a notes app</figcaption></figure>
+      <figure class="shot"><img src="screenshots/sample-comic.png" width="1440" height="900" loading="lazy" alt="A comic zine style page for a padel club."><figcaption>Comic zine, a padel club</figcaption></figure>
+      <figure class="shot"><img src="screenshots/sample-bento.png" width="1440" height="900" loading="lazy" alt="A bento tile layout for an ops dashboard."><figcaption>Bento tiles, an ops dashboard</figcaption></figure>
+      <figure class="shot"><img src="screenshots/sample-seed-bank.png" width="1440" height="900" loading="lazy" alt="A dense operator console for a seed bank."><figcaption>Dense operator console, a seed bank</figcaption></figure>
+    </div>
+  </div>
+</section>
+
+<section id="results">
+  <div class="wrap">
+    <h2>The result depends on your brief and on your models.</h2>
+    <p>Unamey is a pipeline, not a magic model. Two things set the quality of what comes out.</p>
+    <ul class="gives">
+      <li><strong>The description</strong><span>A brief that names the users, the objects on screen and the main task gets a screen that fits that task. Two vague sentences get a generic one. The expansion step fills in structure, but your words stay the source: it cannot invent what you did not say.</span></li>
+      <li><strong>The models</strong><span>The drawing model writes the pages, an optional cheaper planner writes the briefs and directions, and fallbacks take over when a model errors. The same brief gave a truncated master-detail on a local 27B model and a complete dashboard on a hosted model. A local model works. A stronger one draws more complete pages.</span></li>
+    </ul>
+    <h3>What we saw, same briefs, same pipeline</h3>
+    <p>Prices are what one generated page cost us through OpenRouter in November 2026; they change, check yours.</p>
+    <ul class="seen">
+      <li><strong>DeepSeek V4.1 Flash</strong> (hosted): the best pages so far, the most complete and the densest. It thinks a lot, so count a few minutes per page. About 2 cents a page, and free on OVHcloud AI Endpoints when we tried.</li>
+      <li><strong>Qwen3.8 27B</strong> (local): good enough for everyday work, about a minute per page, no bill. Pages are shorter, and a long master-detail can come out cut short.</li>
+      <li><strong>Qwen3.7 Flash</strong> (hosted): fast and under half a cent a page, pages on par with the local model. Few runs so far, take it as a first impression.</li>
+      <li><strong>GLM 5.3 Flash</strong> (hosted): disappointing. Its thinking regularly ate the whole output budget and returned an empty page, which a fallback model had to redo. Pages were fine when it did answer, at about 1.5 cents each.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="pack" class="alt">
+  <div class="wrap">
+    <h2>The pack is the decision, as files.</h2>
+    <p>Each project exports one folder the agent can read.</p>
+<pre class="tree"><b>packs/&lt;project&gt;/</b>
+├── <b>SKILL.md</b>               <i>product, chosen style and structure, shell, tokens, do/don't, pages</i>
+├── <b>tokens.css</b>             <i>design tokens as CSS variables, plus success, warning, danger</i>
+├── <b>reference.html</b>         <i>the look's page, the one to imitate</i>
+└── pages/
+    ├── <b>&lt;page&gt;.html</b>         <i>one standalone page per screen</i>
+    └── <b>&lt;page&gt;.mobile.html</b>  <i>its mobile version</i></pre>
+    <p>Copy the pack to <code>&lt;app&gt;/.claude/skills/ui-pack/</code> and ask your coding agent to build the screens following that skill. It gets the style, the tokens and the pages to copy.</p>
+  </div>
+</section>
+
+<section id="run">
+  <div class="wrap">
+    <h2>Run it yourself.</h2>
+    <ul class="reqs">
+      <li>Rust stable, Node 20+ and <code>just</code>.</li>
+      <li>Docker, for the dev PostgreSQL.</li>
+      <li>An OpenAI-compatible endpoint that accepts tool calls. It works on a local 27B model.</li>
+    </ul>
+<pre class="cmd"><code>git clone https://github.com/ikarys/Unamey
+cd Unamey
+just setup
+just dev</code></pre>
+    <p>Then open <a href="http://localhost:5180">http://localhost:5180</a>. Set a provider in Settings first. The <a href="https://github.com/ikarys/Unamey#run">README</a> has the full variable table.</p>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Unamey is released under AGPL-3.0. Written with AI assistance, reviewed by the maintainer.</p>
+    <ul>
+      <li><a href="https://github.com/ikarys/Unamey/blob/main/VIBECODING.md">VIBECODING.md</a></li>
+      <li><a href="https://github.com/ikarys/Unamey/blob/main/VERIFICATION.md">VERIFICATION.md</a></li>
+      <li><a href="https://github.com/ikarys/Unamey/blob/main/SECURITY.md">SECURITY.md</a></li>
+    </ul>
+    <p>Ikarys</p>
+  </div>
+</footer>
+</body>
+</html>

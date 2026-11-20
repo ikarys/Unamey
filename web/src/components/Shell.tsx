@@ -1,6 +1,7 @@
-import { ArrowLeft, Eye, Loader, LogOut, Moon, Shield, Sun, User } from 'lucide-react';
+import { ArrowLeft, CircleHelp, Eye, Loader, LogOut, Moon, Shield, Sun, User } from 'lucide-react';
 import { VIEW_AS_KEY, type Me } from '../api';
 import { useApp } from './AppContext';
+import { openHelp } from './Help';
 import { LANGS, lang, setLang, t, tn, type Lang } from '../i18n';
 
 type Screen = { id: 'home' | 'generate' | 'gallery' | 'styles' | 'account' | 'admin/models' | 'admin/users' | 'admin/jobs' | 'admin/cache'; label: string; area: 'studio' | 'admin'; nav?: false };
@@ -16,7 +17,9 @@ export const SCREENS: Screen[] = [
   { id: 'admin/cache', label: t('nav.cache'), area: 'admin' }
 ];
 export type ScreenId = Screen['id'];
-export const visibleScreens = (me: Me) => SCREENS.filter((s) => (s.id === 'account' ? me.multi_user : s.area === 'studio' || me.admin));
+// Accounts and the member view only exist in multi-user mode; local mode has one actor.
+export const visibleScreens = (me: Me) =>
+  SCREENS.filter((s) => (s.id === 'account' ? me.multi_user : s.id === 'admin/users' ? me.multi_user && me.admin : s.area === 'studio' || me.admin));
 // Reached from projects and screens only, so not in the nav.
 export const navScreens = (me: Me) => visibleScreens(me).filter((s) => s.nav !== false);
 export const areaOf = (id: ScreenId) => SCREENS.find((s) => s.id === id)?.area ?? 'studio';
@@ -35,7 +38,7 @@ export function TopBar({ current, onHelp, dark, onTheme }: { current: ScreenId; 
   const screens = navScreens(me).filter((s) => s.area === area);
   return (
     <header className="flex h-14 shrink-0 items-center gap-4 whitespace-nowrap border-b border-line bg-canvas px-4 text-[14px] lg:gap-8 lg:px-6">
-      <a href="#/" title={t('nav.home')} className="text-[15px] font-bold tracking-tight text-ink hover:text-accent">AI·UI·Mockup</a>
+      <a href="#/" title={t('nav.home')} className="flex items-center gap-2 text-[15px] font-bold tracking-tight text-ink hover:text-accent"><img src="/icon-192.png" width="22" height="22" alt="" className="h-[22px] w-[22px] rounded" />Unamey</a>
       {area === 'admin' && <span className="-ml-2 lg:-ml-5 rounded-full bg-raised px-2 py-0.5 text-[12px] font-semibold text-accent">{t('nav.admin')}</span>}
       <nav aria-label={t('nav.main')} className="flex h-full gap-6">
         {screens.map(({ id, label }, i) => (
@@ -68,7 +71,7 @@ export function TopBar({ current, onHelp, dark, onTheme }: { current: ScreenId; 
         )}
         {area === 'studio' && me.admin && (
           <>
-            <button onClick={() => viewAs(true)} title={t('nav.viewAsMemberTitle')} aria-label={t('nav.viewAsMember')} className="inline-flex items-center gap-1.5 hover:text-ink"><Eye size={15} /><span className="hidden xl:inline">{t('nav.viewAsMember')}</span></button>
+            {me.multi_user && <button onClick={() => viewAs(true)} title={t('nav.viewAsMemberTitle')} aria-label={t('nav.viewAsMember')} className="inline-flex items-center gap-1.5 hover:text-ink"><Eye size={15} /><span className="hidden xl:inline">{t('nav.viewAsMember')}</span></button>}
             <a href="#/admin/models" title={t('nav.adminConsole')} aria-label={t('nav.admin')} className="inline-flex items-center gap-1.5 hover:text-ink"><Shield size={15} /><span className="hidden xl:inline">{t('nav.admin')}</span></a>
           </>
         )}
@@ -81,6 +84,7 @@ export function TopBar({ current, onHelp, dark, onTheme }: { current: ScreenId; 
             <button onClick={signOut} title={t('nav.signOut')} aria-label={t('nav.signOut')} className="inline-flex items-center gap-1.5 hover:text-ink"><LogOut size={15} /><span className="hidden xl:inline">{t('nav.signOut')}</span></button>
           </>
         )}
+        <button onClick={() => openHelp('firstRun')} title={t('nav.help')} aria-label={t('nav.help')} className="inline-flex items-center gap-1.5 hover:text-ink"><CircleHelp size={15} /><span className="hidden xl:inline">{t('nav.help')}</span></button>
         {area === 'admin' && <button onClick={onHelp} title={t('nav.shortcutsTitle')} className="hover:text-ink">?</button>}
         <span className="relative inline-flex items-center">
           <Flag lang={lang} className="pointer-events-none absolute left-2.5" />

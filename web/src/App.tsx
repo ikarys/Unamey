@@ -4,6 +4,7 @@ import { useAsync } from './hooks/useAsync';
 import { AppContext } from './components/AppContext';
 import { SCREENS, ShortcutsOverlay, TopBar, areaOf, visibleScreens, type ScreenId } from './components/Shell';
 import { ErrorRow, Toast } from './components/ui';
+import { HelpDrawer, type HelpSection } from './components/Help';
 import { Generate } from './screens/Generate';
 import { Home } from './screens/Home';
 import { Styles } from './screens/Styles';
@@ -26,6 +27,7 @@ const THEME_KEY = 'studio:theme';
 export default function App() {
   const [route, setRoute] = useState<ScreenId | null>(fromHash);
   const [help, setHelp] = useState(false);
+  const [guide, setGuide] = useState<HelpSection | null>(null);
   const [dark, setDark] = useState(() => (localStorage.getItem(THEME_KEY) ?? (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light')) === 'dark');
   const [msg, setMsg] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -49,6 +51,12 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const on = (e: Event) => setGuide((e as CustomEvent<HelpSection>).detail);
+    addEventListener('studio:help', on);
+    return () => removeEventListener('studio:help', on);
+  }, []);
+
+  useEffect(() => {
     if (!user) return;
     const on = () => me.reload();
     addEventListener('studio:unauthorized', on);
@@ -63,7 +71,7 @@ export default function App() {
       const t = e.target as HTMLElement;
       if (/INPUT|TEXTAREA|SELECT/.test(t.tagName) || e.ctrlKey || e.metaKey) return;
       if (e.key === '?') setHelp((h) => !h);
-      else if (e.key === 'Escape') setHelp(false);
+      else if (e.key === 'Escape') { setHelp(false); setGuide(null); }
       else if (/^[1-9]$/.test(e.key)) {
         const areaScreens = screens.filter((s) => s.nav !== false && s.area === areaOf(screen));
         const target = areaScreens[+e.key - 1];
@@ -101,6 +109,7 @@ export default function App() {
         </main>
       </div>
       {help && <ShortcutsOverlay onClose={() => setHelp(false)} />}
+      {guide && <HelpDrawer section={guide} onClose={() => setGuide(null)} />}
       <Toast msg={msg} />
     </AppContext.Provider>
   );
