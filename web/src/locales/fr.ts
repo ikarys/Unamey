@@ -35,6 +35,7 @@ export const fr: Record<keyof typeof en, string> = {
   'nav.memberViewExit': 'Vue membre · quitter',
   'nav.signOut': 'Se déconnecter',
   'nav.shortcutsTitle': 'Raccourcis clavier (?)',
+  'nav.help': 'Aide',
   'nav.shortcuts': 'Raccourcis clavier',
   'nav.lightMode': 'Mode clair',
   'nav.darkMode': 'Mode sombre',
