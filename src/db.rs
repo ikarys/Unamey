@@ -5,7 +5,7 @@ use crate::authz::Actor;
 use crate::config::{Config, Llm, Routes};
 use crate::models;
 use crate::sql::args;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use llm_providers_connector::{ApiKey, MasterKey, ModelPrefs, ModelRef, Price, Provider};
 use rango::prelude::*;
 use serde::{Deserialize, Serialize};
@@ -28,6 +28,14 @@ fn ts(d: DateTime<Utc>) -> String {
 fn now() -> FieldDateTime {
     FieldDateTime(Utc::now())
 }
+
+/// Times are bound from Rust, never computed in SQL: the two backends have no common `now()` or `date_trunc`.
+fn month_start(now: DateTime<Utc>) -> DateTime<Utc> {
+    now.date_naive().with_day(1).expect("day 1 exists").and_hms_opt(0, 0, 0).expect("midnight exists").and_utc()
+}
+
+/// `last_seen` is refreshed at most this often, so a busy session does not write on every request.
+const SESSION_TOUCH: chrono::Duration = chrono::Duration::minutes(5);
 
 const HEX: &[u8; 16] = b"0123456789abcdef";
 
@@ -171,7 +179,7 @@ pub async fn users(cfg: &Config) -> Result<Value, String> {
     let mut cost_by_user: std::collections::HashMap<Uuid, f64> = std::collections::HashMap::new();
     let gens: Vec<(Uuid, String, Option<Value>)> = cfg
         .pool
-        .fetch_all("SELECT owner_id, model, notes_json FROM generations WHERE created_at >= date_trunc('month', now())", vec![])
+        .fetch_all("SELECT owner_id, model, notes_json FROM generations WHERE created_at >= $1", args![month_start(Utc::now())])
         .await
         .map_err(es)?
         .into_iter()
@@ -193,7 +201,7 @@ pub async fn users(cfg: &Config) -> Result<Value, String> {
     for (id, mut u) in list {
         let generations_month: i64 = cfg
             .pool
-            .fetch_one("SELECT COUNT(*) FROM generations WHERE owner_id = $1 AND created_at >= date_trunc('month', now())", args![id])
+            .fetch_one("SELECT COUNT(*) FROM generations WHERE owner_id = $1 AND created_at >= $2", args![id, month_start(Utc::now())])
             .await
             .map_err(es)?
             .get(0);
@@ -293,10 +301,17 @@ pub async fn login(cfg: &Config, email: &str, password: &str, user_agent: &str) 
 
 pub async fn session(cfg: &Config, token: &str) -> Result<Option<Actor>, String> {
     let hash = sha256_hex(token);
-    let row = cfg.pool.fetch_optional("SELECT u.id, u.admin FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > now() AND NOT u.disabled", args![&hash]).await.map_err(es)?;
+    let row = cfg.pool.fetch_optional("SELECT u.id, u.admin FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1 AND s.expires_at > $2 AND u.disabled = $3", args![&hash, Utc::now(), false]).await.map_err(es)?;
     let a = row.map(|r| Actor { id: r.get::<Uuid, _>(0), admin: r.get::<bool, _>(1) });
     if a.is_some() {
-        cfg.pool.execute("UPDATE sessions SET last_seen = now() WHERE token_hash = $1 AND (last_seen IS NULL OR last_seen < now() - interval '5 minutes')", args![&hash]).await.map_err(es)?;
+        let now = Utc::now();
+        cfg.pool
+            .execute(
+                "UPDATE sessions SET last_seen = $2 WHERE token_hash = $1 AND (last_seen IS NULL OR last_seen < $3)",
+                args![&hash, now, now - SESSION_TOUCH],
+            )
+            .await
+            .map_err(es)?;
     }
     Ok(a)
 }
@@ -375,7 +390,7 @@ async fn delete_other_sessions(tx: &mut crate::sql::Tx, user_id: Uuid, keep_toke
 
 pub async fn sessions(cfg: &Config, user_id: Uuid, current_token: &str) -> Result<Value, String> {
     let cur = sha256_hex(current_token);
-    let rows = cfg.pool.fetch_all("SELECT id, token_hash, user_agent, created_at, last_seen FROM sessions WHERE user_id = $1 AND expires_at > now() ORDER BY last_seen DESC, created_at DESC", args![user_id]).await.map_err(es)?;
+    let rows = cfg.pool.fetch_all("SELECT id, token_hash, user_agent, created_at, last_seen FROM sessions WHERE user_id = $1 AND expires_at > $2 ORDER BY last_seen DESC, created_at DESC", args![user_id, Utc::now()]).await.map_err(es)?;
     Ok(Value::Array(rows.into_iter().map(|r| {
         let id: Uuid = r.get(0);
         let token_hash: String = r.get(1);
@@ -445,9 +460,11 @@ pub async fn user_detail(cfg: &Config, user_id: Uuid) -> Result<Option<Value>, S
 }
 
 pub async fn usage(cfg: &Config, user_id: Uuid) -> Result<Value, String> {
-    let rows = cfg.pool.fetch_all("SELECT to_char(created_at, 'YYYY-MM') AS month, COUNT(*) FROM generations WHERE owner_id = $1 GROUP BY 1 ORDER BY 1 DESC LIMIT 12", args![user_id])
-    .await
-    .map_err(es)?;
+    let sql = format!(
+        "SELECT {} AS month, COUNT(*) FROM generations WHERE owner_id = $1 GROUP BY 1 ORDER BY 1 DESC LIMIT 12",
+        cfg.pool.month("created_at")
+    );
+    let rows = cfg.pool.fetch_all(&sql, args![user_id]).await.map_err(es)?;
     let mut by = Vec::with_capacity(rows.len());
     for r in rows {
         let month: String = r.get(0);
@@ -457,13 +474,13 @@ pub async fn usage(cfg: &Config, user_id: Uuid) -> Result<Value, String> {
     by.reverse();
     let month_generations: i64 = cfg
         .pool
-        .fetch_one("SELECT COUNT(*) FROM generations WHERE owner_id = $1 AND created_at >= date_trunc('month', now())", args![user_id])
+        .fetch_one("SELECT COUNT(*) FROM generations WHERE owner_id = $1 AND created_at >= $2", args![user_id, month_start(Utc::now())])
         .await
         .map_err(es)?
         .get(0);
     let month_projects: i64 = cfg
         .pool
-        .fetch_one("SELECT COUNT(*) FROM projects WHERE owner_id = $1 AND created_at >= date_trunc('month', now())", args![user_id])
+        .fetch_one("SELECT COUNT(*) FROM projects WHERE owner_id = $1 AND created_at >= $2", args![user_id, month_start(Utc::now())])
         .await
         .map_err(es)?
         .get(0);
@@ -2001,7 +2018,10 @@ mod tests {
         assert_eq!(shared_screens(&cfg, &zeros).await.unwrap(), None);
 
         let (sid2, token2) = create_share(&cfg, LOCAL, Some(g1), None, None).await.unwrap();
-        cfg.pool.execute("UPDATE shares SET expires_at = now() - interval '1 minute' WHERE id = $1", args![sid2]).await.unwrap();
+        cfg.pool
+            .execute("UPDATE shares SET expires_at = $1 WHERE id = $2", args![Utc::now() - chrono::Duration::minutes(1), sid2])
+            .await
+            .unwrap();
         assert_eq!(shared_screens(&cfg, &token2).await.unwrap(), None);
 
         assert!(!revoke_share(&cfg, other, sid).await.unwrap());
@@ -2013,5 +2033,12 @@ mod tests {
         assert_eq!(list[0]["id"], json!(sid2));
         let expected_label = format!("#{}", &g1.to_string()[28..]);
         assert_eq!(list[0]["label"].as_str(), Some(expected_label.as_str()));
+    }
+
+    #[test]
+    fn month_start_truncates_to_the_first_at_midnight() {
+        use chrono::TimeZone;
+        let d = Utc.with_ymd_and_hms(2026, 11, 20, 10, 30, 5).unwrap();
+        assert_eq!(month_start(d), Utc.with_ymd_and_hms(2026, 11, 1, 0, 0, 0).unwrap());
     }
 }
