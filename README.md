@@ -1,5 +1,7 @@
 # Unamey
 
+<img src="docs/logo/unamey-800.png" width="180" alt="Unamey logo: a chameleon curled on itself, in teal, blue and orange.">
+
 [![Vibecoding Convention](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/ikarys/Unamey/main/audit/status.json)](VIBECODING.md)
 
 A mockup studio for apps built with coding agents. Describe the product, get several looks as real HTML screens, compare and rework them, pick one, generate the other pages on it, then hand the agent a pack of files to build from: a skill, the tokens, and one HTML page per screen.
