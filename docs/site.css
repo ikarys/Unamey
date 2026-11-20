@@ -1,13 +1,15 @@
 :root{
   --bg:#ffffff; --tint:#f4f6fb; --ink:#14172b; --muted:#4d5470; --line:#dde1ee;
   --accent:#2a36e0; --accent-ink:#ffffff; --accent-soft:#e8eaff;
+  --navy:#030618; --navy-ink:#c3cae6; --navy-line:rgba(255,255,255,.14); --teal:#3cd0c8; --orange:#f3a63a;
   --display:"Bricolage Grotesque","Avenir Next","Segoe UI",system-ui,sans-serif;
   --text:"Figtree","Segoe UI",system-ui,-apple-system,sans-serif;
   --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
   --wrap:72rem;
 }
 *,*::before,*::after{box-sizing:border-box}
-html{scroll-behavior:smooth;scroll-padding-top:5rem}
+html{scroll-behavior:smooth;scroll-padding-top:5rem;background:var(--navy)}
+main{background:var(--bg)}
 body{margin:0;background:var(--bg);color:var(--ink);font:1.0625rem/1.65 var(--text);-webkit-font-smoothing:antialiased}
 img{max-width:100%;height:auto;display:block}
 a{color:var(--accent);text-underline-offset:.2em}
@@ -26,28 +28,36 @@ section{padding:clamp(3.5rem,8vw,6.5rem) 0}
 code{font-family:var(--mono);font-size:.9em;background:var(--accent-soft);padding:.1em .35em;border-radius:.3em}
 pre code{font:inherit;background:none;color:inherit;padding:0}
 
-/* header */
-.site-header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+/* header: sits on the dark hero, so it shares its ground */
+.site-header{position:sticky;top:0;z-index:10;background:rgba(3,6,24,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--navy-line)}
 .bar{display:flex;align-items:center;gap:1.25rem;min-height:3.75rem;flex-wrap:wrap}
-.brand{font-family:var(--display);font-weight:800;font-size:1.4rem;letter-spacing:-.03em;color:var(--ink);text-decoration:none;margin-right:auto}
+.brand{display:inline-flex;align-items:center;gap:.6rem;font-family:var(--display);font-weight:800;font-size:1.4rem;letter-spacing:-.03em;color:#fff;text-decoration:none;margin-right:auto}
+.brand img{width:1.75rem;height:1.75rem;border-radius:.4rem}
 .bar nav ul{display:flex;gap:1.1rem;list-style:none;margin:0;padding:0;flex-wrap:wrap}
-.bar nav a{color:var(--muted);text-decoration:none;font-weight:500;padding:.4rem 0}
-.bar nav a:hover{color:var(--ink)}
-.gh{font-weight:600;text-decoration:none;color:var(--ink);border:1.5px solid var(--ink);padding:.35rem .9rem;border-radius:99px}
-.gh:hover{background:var(--ink);color:#fff}
+.bar nav a{color:var(--navy-ink);text-decoration:none;font-weight:500;padding:.4rem 0}
+.bar nav a:hover{color:#fff}
+.gh{font-weight:600;text-decoration:none;color:#fff;border:1.5px solid #fff;padding:.35rem .9rem;border-radius:99px}
+.gh:hover{background:#fff;color:var(--navy)}
 
-/* buttons */
-.btn{display:inline-block;font-weight:650;text-decoration:none;padding:.8rem 1.4rem;border-radius:.7rem;border:2px solid var(--accent);transition:background .15s,color .15s}
-.btn.primary{background:var(--accent);color:var(--accent-ink)}
-.btn.primary:hover{background:#1b25b0;border-color:#1b25b0;color:#fff}
-.btn.ghost{color:var(--accent);background:#fff}
-.btn.ghost:hover{background:var(--accent-soft)}
+/* buttons: only used on the dark hero; orange is the logo's warm tone */
+.btn{display:inline-block;font-weight:650;text-decoration:none;padding:.8rem 1.4rem;border-radius:.7rem;border:2px solid var(--orange);transition:background .15s,color .15s}
+.btn.primary{background:var(--orange);color:var(--navy)}
+.btn.primary:hover{background:#ffc264;border-color:#ffc264;color:var(--navy)}
+.btn.ghost{color:#fff;border-color:rgba(255,255,255,.45)}
+.btn.ghost:hover{background:rgba(255,255,255,.1);color:#fff}
 .cta{display:flex;gap:.8rem;flex-wrap:wrap;margin-top:1.6rem}
 
-/* hero */
-.hero{padding-top:clamp(3rem,7vw,5.5rem);background:linear-gradient(180deg,var(--accent-soft) 0,#fff 70%)}
-.hero .lead{font-size:1.25rem;color:var(--muted);max-width:52ch}
-.frame{margin:3rem 0 0;padding:.7rem;background:#fff;border:1px solid var(--line);border-radius:1.2rem;box-shadow:0 30px 60px -30px rgba(42,54,224,.35)}
+/* hero: the logo's own ground; the image blends into it edge-free */
+.hero{padding-top:clamp(2rem,5vw,3.5rem);background:var(--navy);color:#fff}
+.hero h1{color:#fff}
+.hero .lead{font-size:1.25rem;color:var(--navy-ink);max-width:52ch}
+.hero-grid{display:grid;gap:2rem;align-items:center}
+.hero .logo{width:min(100%,22rem);height:auto;justify-self:center;order:-1}
+@media(min-width:56rem){
+  .hero-grid{grid-template-columns:1.1fr .9fr;gap:3rem}
+  .hero .logo{width:min(100%,30rem);justify-self:end;order:0}
+}
+.frame{margin:3rem 0 0;padding:.7rem;background:rgba(255,255,255,.06);border:1px solid var(--navy-line);border-radius:1.2rem;box-shadow:0 30px 60px -30px rgba(60,208,200,.45)}
 .frame img{border-radius:.7rem;width:100%}
 .hero-in{animation:rise .7s ease-out both}
 @keyframes rise{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
