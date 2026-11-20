@@ -5,7 +5,7 @@ welcome.
 
 ## How to run
 
-- `just dev` needs Rust, Node, `just` and the dev PostgreSQL described in the README (Requirements).
+- `just dev` needs Rust, Node and `just`; it runs on SQLite, and `cargo test` alone needs no Docker. `just dev-pg` and the Postgres half of `just test` need the dev PostgreSQL described in the README (Requirements).
 - `just test`
 - `cargo clippy -- -D warnings`
 - `cargo fmt --check`

@@ -27,7 +27,7 @@ which stays the reference where they overlap.
 
 ## Before merging
 
-- `just test` (Rust tests on the shared dev Postgres + `tsc`), `cargo clippy
+- `just test` (Rust tests on SQLite, then on the shared dev Postgres, + `tsc`), `cargo clippy
   -- -D warnings`, `cargo fmt --check`.
 - A behaviour change gets a test; a user-visible change updates `README.md`
   or `docs/`.

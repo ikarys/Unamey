@@ -23,7 +23,7 @@ A strong coding agent (Claude Code with Opus and the `frontend-design` skill, sa
 ## Requirements
 
 - Rust stable, Node 20+, `just`.
-- Docker, for the dev PostgreSQL the recipes expect: a container named `devpg` on `127.0.0.1:5432`, user `dev`, password `dev`, allowed to create databases. One way: `docker run -d --name devpg --restart unless-stopped -p 127.0.0.1:5432:5432 -e POSTGRES_USER=dev -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=studio postgres:17`. Deployments set `DATABASE_URL` themselves.
+- Docker, only for `just dev-pg` and the Postgres half of `just test` (`just dev` runs on SQLite): a container named `devpg` on `127.0.0.1:5432`, user `dev`, password `dev`, allowed to create databases. One way: `docker run -d --name devpg --restart unless-stopped -p 127.0.0.1:5432:5432 -e POSTGRES_USER=dev -e POSTGRES_PASSWORD=dev -e POSTGRES_DB=studio postgres:17`. Deployments set `DATABASE_URL` themselves.
 - An OpenAI-compatible LLM endpoint that accepts tool calls. Development uses a llama.cpp-style server running `qwen3.8-27b`, a reasoning model; hosted providers (OpenRouter, OVHcloud AI Endpoints...) work the same way through the Settings drawer.
 - Optional: Chromium (`chromium` on PATH) for the PNG export and URL capture.
 - Optional: the `impeccable` skill for the finish layer, configured with `STUDIO_IMPECCABLE_DIR`.
@@ -31,22 +31,23 @@ A strong coding agent (Claude Code with Opus and the `frontend-design` skill, sa
 ## Run
 
 ```bash
-just dev          # backend on 7700 + Vite on http://localhost:5180
+just dev          # backend on 7700 (SQLite, dev.db) + Vite on http://localhost:5180
+just dev-pg       # same, on the dev PostgreSQL
 just multi-user   # same, in multi-user mode (accounts)
 just build        # front into web/dist + release binary
 just run          # serve the built front from the binary on 7700
-just test         # cargo test on the dev Postgres + tsc
+just test         # cargo test on SQLite, then on the dev Postgres, then tsc
 just lint         # clippy
-just dev-reset    # drop the dev data
+just dev-reset    # drop the dev data (dev.db and the Postgres database)
 ```
 
-`just dev` needs the dev PostgreSQL (`just db` applies the migrations) and works on `dev-skill/`, copied once from the shipped skill. Open the app once `cargo` has finished compiling; before that, `/api` answers 503. The database starts empty: set a provider in Settings (click the model name in the top bar). The Help button in the top bar opens the user guide inside the app, in English or French; the same guide is published at <https://ikarys.github.io/Unamey/help.html>. `just setup` installs the rango CLI once.
+`just dev` runs on SQLite (`dev.db`, created at first start) and works on `dev-skill/`, copied once from the shipped skill; `just dev-pg` runs the same on the dev PostgreSQL (`just db` applies the migrations). Open the app once `cargo` has finished compiling; before that, `/api` answers 503. The database starts empty: set a provider in Settings (click the model name in the top bar). The Help button in the top bar opens the user guide inside the app, in English or French; the same guide is published at <https://ikarys.github.io/Unamey/help.html>. `just setup` installs the rango CLI once.
 
 The server binds to `127.0.0.1` by default; `GET /healthz` answers `ok` without auth. Generated HTML is previewed in iframes with `sandbox="allow-scripts"` only, never `allow-same-origin`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `DATABASE_URL` | required | PostgreSQL URL (`just` recipes use the local one) |
+| `DATABASE_URL` | `sqlite://studio.db` | PostgreSQL URL, or `sqlite://<file>` (created with mode 0600; `just` recipes use `dev.db`) |
 | `STUDIO_KEY_FILE` | `studio.key` | master key sealing the provider API keys (created at first use, mode 0600; `just` recipes use `dev.key`, keep it private) |
 | `STUDIO_LLM_URL` | `http://127.0.0.1:8000/v1` | seeds the first provider at first start only; settings then live in the DB |
 | `STUDIO_MODEL` | `qwen3.8-27b` | seeds the first provider's model at first start only |

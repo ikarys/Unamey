@@ -20,7 +20,7 @@ pub struct Routes {
 }
 
 pub struct Config {
-    pub pool: rango::PgPool,
+    pub pool: crate::sql::Db,
     /// Runs the async DB calls from sync code (jobs and the pipeline, on the blocking pool): see `block`.
     pub rt: tokio::runtime::Handle,
     /// Seals the providers' API keys (env STUDIO_KEY_FILE).
@@ -71,7 +71,7 @@ impl Config {
         self.rt.block_on(f)
     }
 
-    pub fn new(pool: rango::PgPool, rt: tokio::runtime::Handle, port: u16) -> Config {
+    pub fn new(pool: crate::sql::Db, rt: tokio::runtime::Handle, port: u16) -> Config {
         let default_llm = Llm {
             url: env("STUDIO_LLM_URL", "http://127.0.0.1:8000/v1"),
             model: env("STUDIO_MODEL", "qwen3.8-27b"),
