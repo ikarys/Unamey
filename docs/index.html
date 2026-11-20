@@ -133,7 +133,15 @@
     <p>Unamey is a pipeline, not a magic model. Two things set the quality of what comes out.</p>
     <ul class="gives">
       <li><strong>The description</strong><span>A brief that names the users, the objects on screen and the main task gets a screen that fits that task. Two vague sentences get a generic one. The expansion step fills in structure, but your words stay the source: it cannot invent what you did not say.</span></li>
-      <li><strong>The models</strong><span>The drawing model writes the pages, an optional cheaper planner writes the briefs and directions, and fallbacks take over when a model errors. The same brief gave a truncated master-detail on a local 27B model and a complete dashboard on a hosted model. A local model works. A stronger one draws more complete pages. Tried so far: a local Qwen3.8 27B, and DeepSeek V4.1 Flash, Qwen3.7 Flash and GLM 5.3 Flash through hosted endpoints.</span></li>
+      <li><strong>The models</strong><span>The drawing model writes the pages, an optional cheaper planner writes the briefs and directions, and fallbacks take over when a model errors. The same brief gave a truncated master-detail on a local 27B model and a complete dashboard on a hosted model. A local model works. A stronger one draws more complete pages.</span></li>
+    </ul>
+    <h3>What we saw, same briefs, same pipeline</h3>
+    <p>Prices are what one generated page cost us through OpenRouter in November 2026; they change, check yours.</p>
+    <ul class="seen">
+      <li><strong>DeepSeek V4.1 Flash</strong> (hosted): the best pages so far, the most complete and the densest. It thinks a lot, so count a few minutes per page. About 2 cents a page, and free on OVHcloud AI Endpoints when we tried.</li>
+      <li><strong>Qwen3.8 27B</strong> (local): good enough for everyday work, about a minute per page, no bill. Pages are shorter, and a long master-detail can come out cut short.</li>
+      <li><strong>Qwen3.7 Flash</strong> (hosted): fast and under half a cent a page, pages on par with the local model. Few runs so far, take it as a first impression.</li>
+      <li><strong>GLM 5.3 Flash</strong> (hosted): disappointing. Its thinking regularly ate the whole output budget and returned an empty page, which a fallback model had to redo. Pages were fine when it did answer, at about 1.5 cents each.</li>
     </ul>
   </div>
 </section>

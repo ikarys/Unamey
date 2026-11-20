@@ -83,8 +83,9 @@ pre code{font:inherit;background:none;color:inherit;padding:0}
 .tree b{color:#fff;font-weight:600}
 .tree i{color:#a9b0e8;font-style:normal}
 pre.cmd{font:1rem/1.8 var(--mono);background:var(--ink);color:#e9ebff;border-radius:1rem;padding:1.3rem 1.5rem;overflow-x:auto;margin:1.5rem 0}
-.reqs{padding-left:1.2rem;max-width:62ch}
-.reqs li{margin-bottom:.4rem}
+.reqs,.seen{padding-left:1.2rem;max-width:62ch}
+.reqs li,.seen li{margin-bottom:.4rem}
+#results h3{margin-top:2.5rem}
 
 /* footer */
 footer{border-top:1px solid var(--line);padding:2.5rem 0 3rem;color:var(--muted);font-size:.98rem}
