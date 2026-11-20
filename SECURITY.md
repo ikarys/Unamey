@@ -12,7 +12,7 @@ In multi-user mode (`STUDIO_ORIGIN` set), it protects each user's projects,
 generations, jobs, account, and provider API keys stored in the database.
 The browser, other users, and LLM output are trust boundaries; model HTML is
 hostile, and the LLM provider is trusted with the briefs. Out of scope are
-the host and its admin, the PostgreSQL server, the admin account (it manages
+the host and its admin, the database server or file, the admin account (it manages
 accounts, providers and settings and sees global counts, but cannot open
 another user's content), single-user mode (binds 127.0.0.1, one local
 user, no accounts), denial of service, and LLM spend abuse beyond the
@@ -22,7 +22,7 @@ per-user job cap.
 
 | Class | Where it could happen here | Covered by (tool rule or test) |
 |---|---|---|
-| SQL injection | `src/db.rs` queries | Parameterised queries through rango-orm and sqlx binds; the one spliced table name is checked against a fixed list (`owner_of`); `db::tests::job_query_bounds_its_input` |
+| SQL injection | `src/db.rs` queries | Parameterised queries through rango-orm and sqlx binds; the one spliced table name is checked against a fixed list (`owner_of`), and the JSON column and path literals spliced by `sql::Db::json_text` are `&'static str` from the code, never input; `db::tests::job_query_bounds_its_input` |
 | Server-side request forgery | Headless Chromium rendering model HTML for the showcase (`src/pipeline/showcase.rs`) | Proxy to a dead port with a bypass list of the Tailwind and Google Fonts hosts only; `pipeline::showcase::tests::chromium_reaches_only_the_allowed_hosts` |
 | Path traversal | Model tool call reading skill files (`src/pipeline/generate.rs` confine); static files served by `src/http.rs` | `pipeline::generate::tests::confinement`, `http::tests::static_paths_never_leave_the_root` |
 | Broken authorization / cross-user access | Every owner-scoped table, `src/authz.rs` policy | `authz::tests::member_uses`, `authz::tests::admin_uses`, `authz::tests::access`, `authz::tests::view_as_member_only_drops_rights`, `db::tests::accounts_and_ownership`, `db::tests::status_shows_only_the_actors_jobs`, `http::tests::other_users_get_404_on_owned_routes` |
@@ -38,6 +38,7 @@ per-user job cap.
 | Claim | Test |
 |---|---|
 | Model tool calls are confined when reading skill files | `pipeline::generate::tests::confinement` |
+| The SQLite database file is readable by the server's user only (mode 0600 set at startup before the first write; SQLite gives the WAL and shm side files the main file's mode, and startup also fixes side files already there) | `sql::tests::sqlite_file_is_private` |
 | Only the owner reaches a project, concept, generation or job, admins included; another user gets 404 on every owned route | `authz::tests::access`, `http::tests::other_users_get_404_on_owned_routes`, `db::tests::accounts_and_ownership`, `db::tests::status_shows_only_the_actors_jobs` |
 | Members get 403 on admin-only API prefixes; admin view as member drops rights | `authz::tests::member_uses`, `authz::tests::admin_uses`, `authz::tests::view_as_member_only_drops_rights` |
 | Static files never leave `web/dist` | `http::tests::static_paths_never_leave_the_root` |

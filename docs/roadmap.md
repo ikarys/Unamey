@@ -110,3 +110,10 @@ Before the first deploy, in this order, one commit each:
    `STUDIO_BIND` / `PORT`, tiny_http is gone.
 5. Front: ids become strings.
 
+## SQLite backend (2026-11-20)
+
+SQLite is back, next to PostgreSQL this time: `DATABASE_URL` picks the backend at runtime (a `postgres://` URL, or
+`sqlite://<file>`, the default), through sqlx on both and rango-orm for the models. `just dev` and `cargo test` run on
+SQLite with no Docker; Postgres stays the deployment target and `just test` runs the suite on both. The SQL is
+written once in the common dialect (`src/sql.rs` holds the two spellings that differ: JSON paths and month buckets).
+No data moves between the two: a deployment that switches backends starts empty.

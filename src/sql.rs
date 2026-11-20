@@ -363,14 +363,20 @@ pub async fn migrate_sqlite(pool: &rango::SqlitePool) -> Result<(), String> {
 }
 
 /// Makes the SQLite file private (0600): it holds password hashes, session token hashes and the sealed provider keys.
-/// The WAL side files inherit the directory's mode. Called after `connect`, which creates the file.
+/// SQLite gives the WAL and shm side files the main file's mode when it creates them, so this runs right after
+/// `connect` (which creates the file) and before the first write; side files already there are fixed too.
 pub fn restrict_mode(url: &str) {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
         let path = url.trim_start_matches("sqlite://").trim_start_matches("sqlite:");
-        if let Err(e) = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600)) {
-            eprintln!("warning: cannot restrict {path}: {e}");
+        for suffix in ["", "-wal", "-shm"] {
+            let file = format!("{path}{suffix}");
+            match std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)) {
+                Ok(()) => {}
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound && !suffix.is_empty() => {}
+                Err(e) => eprintln!("warning: cannot restrict {file}: {e}"),
+            }
         }
     }
     #[cfg(not(unix))]
@@ -597,5 +603,26 @@ mod tests {
         let db = test_db().await;
         let Db::Sqlite { tmp: Some(tmp), .. } = &db else { unreachable!() };
         assert_eq!(std::fs::metadata(&tmp.0).unwrap().permissions().mode() & 0o777, 0o600);
+    }
+
+    /// The WAL and shm side files hold the same data as the database; the migrations create them before `start` restricts the mode.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn sqlite_side_files_are_private() {
+        if std::env::var("TEST_DATABASE_URL").is_ok() {
+            return;
+        }
+        use std::os::unix::fs::PermissionsExt;
+        let path = std::env::temp_dir().join(format!("unamey-test-{}.db", Uuid::new_v4().simple()));
+        let _tmp = TempDb(path.clone());
+        let url = format!("sqlite://{}", path.display());
+        let Db::Sqlite { pool, .. } = Db::connect(&url).await.unwrap() else { unreachable!() };
+        migrate_sqlite(&pool).await.unwrap();
+        restrict_mode(&url);
+        for suffix in ["", "-wal", "-shm"] {
+            let mut p = path.clone().into_os_string();
+            p.push(suffix);
+            assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600, "{suffix:?}");
+        }
     }
 }

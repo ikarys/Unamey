@@ -12,12 +12,12 @@ Flow: generate screens from a brief with a fixed skill (`skill/app-layout-patter
 ```
 Cargo.toml            single binary crate `studio` (no workspace: one real boundary only)
 src/
-  main.rs             CLI: `studio serve [--port 7700]` (database: `DATABASE_URL`; address: `STUDIO_BIND`, `PORT`)
+  main.rs             CLI: `studio serve [--port 7700]` (database: `DATABASE_URL`, a PostgreSQL URL or `sqlite://<file>`, default `sqlite://studio.db`; address: `STUDIO_BIND`, `PORT`)
   authz.rs            PURE authorization policy: `Actor {id, admin}`, `LOCAL` (user `00000000-…-0001`, admin, the implicit actor of single-tenant mode), `can_use(actor, api prefix)` (admin-only prefixes: admin, cache, settings, users), `can_access(actor, owner_id)` (owner only: an admin manages accounts and settings, never another user's content) + unit tests. http.rs applies it
   config.rs           `Llm` = the active endpoint, model, key and `parallel` (variants of one job generated at once, 1..=3, per provider under settings key `parallel`) (`cfg.llm()`); env defaults `STUDIO_LLM_URL` / `STUDIO_MODEL` only seed the first provider. Providers live in the `settings` table: key `providers` (JSON array of llm-providers `Provider`; each model keeps its `ModelPrefs`, whose `price` is optional, API keys only as `ApiKey::Sealed` with the master key file `STUDIO_KEY_FILE` (default `studio.key`), mode 0600, never returned by the API) key `active` (`ModelRef`, the generator's first target), key `routing` (`{planner: ModelRef|null, fallbacks: [ModelRef]}`, max 5) and key `extras` (`{provider: {model: object}}`, sent as the crate's `ChatRequest.extra`). `cfg.routes()` holds the resolved targets per stage: generator = active + fallbacks, planner = (planner or active) + fallbacks, deduplicated. At first start the env defaults become provider `default`. API: `GET /api/settings` -> `{providers:[{id,name,base_url,api_key_set,parallel,models,prices:{model:{input_per_m,cached_per_m,output_per_m}},extras:{model:object}}], active, routing, endpoint_ok}`; `PUT /api/settings` with `{providers:[{id,name,base_url,api_key?,parallel?,models,prices?,extras?}], active, routing?}` (`prices` = $ per million tokens, only for priced models; `api_key` absent keeps the stored key, `""` removes it); `POST /api/settings/models` `{id?,base_url,api_key?}` -> `{models}` (502 with the endpoint error when unreachable). Editable live from the Settings drawer, paths (env: see README)
-  models.rs           rango models = the PostgreSQL schema; `rango makemigrations` writes `migrations/`, `rango migrate` applies them (`just db`)
-  pg.rs               the `PgPool` from `DATABASE_URL`; `test_pool()` = a fresh database per test cloned from the migrated `studio_test`
-  db.rs               async queries on `cfg.pool` (rango for single-row inserts, sqlx for joins / JSON / bulk updates; sync callers use `cfg.block`); ids are UUID v7, timestamps leave the API as `YYYY-MM-DD HH:MM:SS` UTC; accounts: `signup` (argon2 password hash; the first account claims the seeded admin user), `login` (email + password → 90-day session, sha256 of the token stored), `session`, `logout`, `owner_of(table, id)`
+  models.rs           rango models = the schema; `rango makemigrations` writes `migrations/` (PostgreSQL, applied by `rango migrate`, `just db`) and `just makemigrations-sqlite` writes `migrations/sqlite/` (embedded, applied at startup); a test checks the two snapshots describe the same tables
+  sql.rs              `Db` over the Postgres or SQLite pool chosen by `DATABASE_URL`: `fetch_*`, `execute`, `begin`, `insert`, `get`, plus `json_text` / `month` for the SQL the two dialects spell differently; SQL text uses `$n` placeholders and nothing Postgres-only (times are bound from Rust, JSON fields are read whole and picked in Rust); `test_db()` = a fresh database per test (a SQLite temp file, or a clone of the migrated `studio_test` when `TEST_DATABASE_URL` is set)
+  db.rs               async queries on `cfg.pool` (rango for single-row inserts, portable SQL through `sql::Db` for joins / bulk updates; sync callers use `cfg.block`); ids are UUID v7, timestamps leave the API as `YYYY-MM-DD HH:MM:SS` UTC; accounts: `signup` (argon2 password hash; the first account claims the seeded admin user), `login` (email + password → 90-day session, sha256 of the token stored), `session`, `logout`, `owner_of(table, id)`
   llm.rs              thin wrapper over llm-providers-connector: one call per `Stage` (planner, generator) tries the stage's targets in order; a target that errors is skipped for 60 s (tried last, never dropped); `Answer` carries the model that answered and the failures, logged as `llm fallback:` in the job log
   pipeline/
     capture.rs        headless Chromium screenshot of an HTML page (showcase export)
@@ -33,14 +33,14 @@ src/
   jobs.rs             background jobs on tokio's blocking pool, state in the `jobs` table
   http.rs             axum server, JSON routes, share pages, static files from web/dist, `/healthz`
 prompts/              generate.md, directions.md, refine.md, edit.md, patch.md, brief.md, mobile.md, desktop_app.md, archetypes.json, structures.json, skill_head.md (include_str!)
-migrations/            SQL generated from models.rs (with snapshot.json)
+migrations/            SQL generated from models.rs for PostgreSQL (with snapshot.json); migrations/sqlite/ the same for SQLite
 type_aliases.json
 web/                  React 19 + Vite + Tailwind 4 + lucide-react; see docs/ui-spec.md
 ```
 
 The dependencies are:
 - `llm-providers-connector` (crates.io, https://github.com/ikarys/llm-providers-connector);
-- `rango-orm` (git tag v0.1.0, https://github.com/ikarys/rango-orm) and `sqlx` 0.8 on PostgreSQL, `tokio`;
+- `rango-orm` (git tag v0.1.1, https://github.com/ikarys/rango-orm) and `sqlx` 0.8 on PostgreSQL and SQLite, `tokio`;
 - `axum`, `serde_json`, `ureq` 3 (rustls), `url`;
 - `sha2`, `base64`;
 - `image` (jpeg, png, webp).
