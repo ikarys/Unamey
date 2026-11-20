@@ -582,8 +582,16 @@ fn run_page(cfg: &Config, job: &Job, request: &Value, page: &str) -> Result<Valu
 
 /// Identities of the owner's last generations, so the planner does not repeat them (never another user's).
 fn recent_identities(cfg: &Config, owner: Uuid) -> Result<String, String> {
-    let sql = "SELECT (notes_json #> '{direction,identity}')::text FROM generations WHERE owner_id = $1 AND notes_json #> '{direction,identity}' IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 4";
-    let recent: Vec<String> = cfg.block(cfg.pool.fetch_all(sql, args![owner])).map_err(es)?.iter().map(|r| r.get::<String, _>(0)).collect();
+    let identity = cfg.pool.json_text("notes_json", &["direction", "identity"]);
+    let sql = format!(
+        "SELECT notes_json FROM generations WHERE owner_id = $1 AND {identity} IS NOT NULL ORDER BY created_at DESC, id DESC LIMIT 4"
+    );
+    let recent: Vec<String> = cfg
+        .block(cfg.pool.fetch_all(&sql, args![owner]))
+        .map_err(es)?
+        .iter()
+        .map(|r| r.get::<Value, _>(0)["direction"]["identity"].to_string())
+        .collect();
     Ok(if recent.is_empty() {
         String::new()
     } else {

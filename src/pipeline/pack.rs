@@ -170,13 +170,13 @@ fn short(id: Uuid) -> String {
 
 /// Builds a generation pack in memory (no disk writes).
 pub fn generation(cfg: &Config, id: Uuid) -> Result<Pack, String> {
-    let sql = "SELECT g.brief_json, g.notes_json, g.html, to_char(g.created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD HH24:MI:SS'), p.name, g.owner_id FROM generations g LEFT JOIN projects p ON p.id = g.project_id WHERE g.id = $1";
+    let sql = "SELECT g.brief_json, g.notes_json, g.html, g.created_at, p.name, g.owner_id FROM generations g LEFT JOIN projects p ON p.id = g.project_id WHERE g.id = $1";
     let row = cfg.block(cfg.pool.fetch_optional(sql, args![id])).map_err(es)?.ok_or_else(|| format!("no generation #{id}"))?;
     let (brief, notes, html, created_at, project, owner) = (
         row.get::<Value, _>(0),
         row.get::<Option<Value>, _>(1),
         row.get::<Option<String>, _>(2),
-        row.get::<String, _>(3),
+        db::ts(row.get::<chrono::DateTime<chrono::Utc>, _>(3)),
         row.get::<Option<String>, _>(4),
         row.get::<Uuid, _>(5),
     );

@@ -190,13 +190,6 @@ impl Db {
 }
 
 impl Tx {
-    pub async fn fetch_all(&mut self, sql: &str, args: Vec<SqlValue>) -> Result<Vec<Row>, sqlx::Error> {
-        match self {
-            Tx::Pg(t) => Ok(bind_pg(sqlx::query(sql), args).fetch_all(&mut **t).await?.into_iter().map(Row::Pg).collect()),
-            Tx::Sqlite(t) => Ok(bind_sqlite(sqlx::query(sql), args).fetch_all(&mut **t).await?.into_iter().map(Row::Sqlite).collect()),
-        }
-    }
-
     pub async fn fetch_optional(&mut self, sql: &str, args: Vec<SqlValue>) -> Result<Option<Row>, sqlx::Error> {
         match self {
             Tx::Pg(t) => Ok(bind_pg(sqlx::query(sql), args).fetch_optional(&mut **t).await?.map(Row::Pg)),

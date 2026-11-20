@@ -21,8 +21,13 @@ pub fn es<E: std::fmt::Display>(e: E) -> String {
 const ADMIN: Uuid = Uuid::from_u128(1);
 
 /// Timestamps leave the API as `YYYY-MM-DD HH:MM:SS` (UTC), the format the front parses.
-fn ts(d: DateTime<Utc>) -> String {
+pub(crate) fn ts(d: DateTime<Utc>) -> String {
     d.format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
+/// SQL for the fallback label of a generation: `#` and the last 8 hex digits of its id (`right()` does not exist in SQLite).
+fn short_label(id: &'static str) -> String {
+    format!("'#' || substr(CAST({id} AS TEXT), length(CAST({id} AS TEXT)) - 7)")
 }
 
 fn now() -> FieldDateTime {
@@ -967,10 +972,7 @@ pub async fn generations(cfg: &Config, owner: Uuid) -> Result<Value, String> {
     let rows = cfg
         .pool
         .fetch_all(
-            "SELECT id, brief_json, model, skill_version, verdict, verdict_note, created_at, html IS NOT NULL,
-                notes_json ->> 'batch', notes_json #>> '{direction,label}', jsonb_array_length(notes_json -> 'detect'),
-                notes_json #>> '{direction,archetype,name}', project_id, page, target,
-                notes_json #>> '{direction,identity,accent}', notes_json #>> '{direction,identity,canvas}', concept_id
+            "SELECT id, brief_json, model, skill_version, verdict, verdict_note, created_at, html IS NOT NULL, notes_json, project_id, page, target, concept_id
          FROM generations WHERE owner_id = $1 ORDER BY created_at DESC, id DESC",
             args![owner],
         )
@@ -979,6 +981,9 @@ pub async fn generations(cfg: &Config, owner: Uuid) -> Result<Value, String> {
     let mut out = Vec::with_capacity(rows.len());
     for r in rows {
         let request: Value = r.get(1);
+        // The notes are read whole and picked apart here: the two backends share no JSON path syntax.
+        let notes = r.get::<Option<Value>, _>(8).unwrap_or(Value::Null);
+        let text = |path: &[&str]| path.iter().fold(&notes, |v, k| &v[*k]).as_str().map(str::to_string);
         out.push(json!({
             "id": json!(r.get::<Uuid, _>(0)),
             "brief": brief_text(&request),
@@ -988,16 +993,16 @@ pub async fn generations(cfg: &Config, owner: Uuid) -> Result<Value, String> {
             "verdict_note": r.get::<Option<String>, _>(5),
             "created_at": ts(r.get::<DateTime<Utc>, _>(6)),
             "has_html": r.get::<bool, _>(7),
-            "batch": r.get::<Option<String>, _>(8),
-            "label": r.get::<Option<String>, _>(9),
-            "detect_count": r.get::<Option<i32>, _>(10),
-            "archetype": r.get::<Option<String>, _>(11),
-            "project_id": r.get::<Option<Uuid>, _>(12),
-            "page": r.get::<Option<String>, _>(13),
-            "target": r.get::<String, _>(14),
-            "accent": r.get::<Option<String>, _>(15),
-            "canvas": r.get::<Option<String>, _>(16),
-            "concept_id": r.get::<Option<Uuid>, _>(17),
+            "batch": text(&["batch"]),
+            "label": text(&["direction", "label"]),
+            "detect_count": notes["detect"].as_array().map(Vec::len),
+            "archetype": text(&["direction", "archetype", "name"]),
+            "project_id": r.get::<Option<Uuid>, _>(9),
+            "page": r.get::<Option<String>, _>(10),
+            "target": r.get::<String, _>(11),
+            "accent": text(&["direction", "identity", "accent"]),
+            "canvas": text(&["direction", "identity", "canvas"]),
+            "concept_id": r.get::<Option<Uuid>, _>(12),
         }));
     }
     Ok(Value::Array(out))
@@ -1063,13 +1068,19 @@ pub async fn set_verdict(cfg: &Config, id: Uuid, verdict: &str, note: Option<&st
 
 /// The batch of `parent`, created from `batch` (the running job id) when it has none, so alternatives sit next to it.
 pub async fn join_batch(cfg: &Config, parent: Uuid, batch: Uuid) -> Result<String, String> {
-    let row = cfg.pool.fetch_optional("UPDATE generations SET notes_json = jsonb_set(COALESCE(notes_json, '{}'::jsonb), '{batch}', COALESCE(notes_json -> 'batch', to_jsonb($2::text))) WHERE id = $1 RETURNING notes_json ->> 'batch'", args![parent, batch.to_string()])
-    .await
-    .map_err(es)?;
-    let Some(row) = row else {
+    let mut tx = cfg.pool.begin().await.map_err(es)?;
+    let Some(row) = tx.fetch_optional("SELECT notes_json FROM generations WHERE id = $1", args![parent]).await.map_err(es)? else {
         return Err(format!("generation {parent} not found"));
     };
-    Ok(row.get::<String, _>(0))
+    let mut notes = row.get::<Option<Value>, _>(0).filter(Value::is_object).unwrap_or_else(|| json!({}));
+    if let Some(existing) = notes["batch"].as_str() {
+        return Ok(existing.to_string());
+    }
+    let id = batch.to_string();
+    notes["batch"] = json!(id);
+    tx.execute("UPDATE generations SET notes_json = $2 WHERE id = $1", args![parent, notes]).await.map_err(es)?;
+    tx.commit().await.map_err(es)?;
+    Ok(id)
 }
 
 pub async fn projects(cfg: &Config, owner: Uuid) -> Result<Value, String> {
@@ -1229,7 +1240,10 @@ pub async fn rename_project(cfg: &Config, id: Uuid, name: &str) -> Result<Option
 pub async fn set_archived(cfg: &Config, id: Uuid, archived: bool) -> Result<Option<Value>, String> {
     let n = cfg
         .pool
-        .execute("UPDATE projects SET archived_at = CASE WHEN $1 THEN COALESCE(archived_at, now()) END WHERE id = $2", args![archived, id])
+        .execute(
+            "UPDATE projects SET archived_at = CASE WHEN $1 THEN COALESCE(archived_at, $2) END WHERE id = $3",
+            args![archived, Utc::now(), id],
+        )
         .await
         .map_err(es)?;
     Ok((n > 0).then(|| json!({"id": json!(id), "archived": archived})))
@@ -1274,7 +1288,10 @@ pub async fn set_identity(cfg: &Config, concept: Uuid, generation: Option<Uuid>)
         let ok: bool = cfg
             .pool
             .fetch_one(
-                "SELECT EXISTS (SELECT 1 FROM generations WHERE id = $1 AND concept_id = $2 AND notes_json -> 'direction' IS NOT NULL)",
+                &format!(
+                    "SELECT EXISTS (SELECT 1 FROM generations WHERE id = $1 AND concept_id = $2 AND {} IS NOT NULL)",
+                    cfg.pool.json_text("notes_json", &["direction"])
+                ),
                 args![g, concept],
             )
             .await
@@ -1310,7 +1327,13 @@ pub async fn move_generation(cfg: &Config, id: Uuid, to: Uuid) -> Result<bool, S
     }
     tx.execute("UPDATE concepts SET identity_id = NULL WHERE identity_id = $1 AND id <> $2", args![id, to]).await.map_err(es)?;
     let moved = tx.execute("UPDATE generations SET concept_id = $2 WHERE id = $1", args![id, to]).await.map_err(es)?;
-    tx.execute("UPDATE concepts SET identity_id = $1 WHERE id = $2 AND identity_id IS NULL AND EXISTS (SELECT 1 FROM generations WHERE id = $1 AND COALESCE(TRIM(page), '') = '' AND notes_json -> 'direction' IS NOT NULL)", args![id, to])
+    tx.execute(
+        &format!(
+            "UPDATE concepts SET identity_id = $1 WHERE id = $2 AND identity_id IS NULL AND EXISTS (SELECT 1 FROM generations WHERE id = $1 AND COALESCE(TRIM(page), '') = '' AND {} IS NOT NULL)",
+            cfg.pool.json_text("notes_json", &["direction"])
+        ),
+        args![id, to],
+    )
     .await
     .map_err(es)?;
     tx.commit().await.map_err(es)?;
@@ -1337,9 +1360,11 @@ pub async fn identity(cfg: &Config, concept: Uuid) -> Result<Option<Value>, Stri
 
 /// One generation per (page, target) of the concept: a `good` one if any, else the latest. `(page, target, id, html, brief)`.
 pub async fn concept_pages(cfg: &Config, concept: Uuid) -> Result<Vec<(String, String, Uuid, String, String)>, String> {
-    let rows = cfg.pool.fetch_all("SELECT page, target, id, html, brief_json->>'brief' FROM generations WHERE concept_id = $1 AND page IS NOT NULL AND html IS NOT NULL ORDER BY page, target, CASE WHEN verdict = 'good' THEN 0 ELSE 1 END, created_at DESC, id DESC", args![concept])
-    .await
-    .map_err(es)?;
+    let sql = format!(
+        "SELECT page, target, id, html, {} FROM generations WHERE concept_id = $1 AND page IS NOT NULL AND html IS NOT NULL ORDER BY page, target, CASE WHEN verdict = 'good' THEN 0 ELSE 1 END, created_at DESC, id DESC",
+        cfg.pool.json_text("brief_json", &["brief"])
+    );
+    let rows = cfg.pool.fetch_all(&sql, args![concept]).await.map_err(es)?;
     let mut pages = rows
         .into_iter()
         .map(|r| {
@@ -1358,16 +1383,13 @@ pub async fn concept_pages(cfg: &Config, concept: Uuid) -> Result<Vec<(String, S
 
 /// The generate request for an alternative of `id`: same brief and seed, one variant, `archetype` forced, joined to its batch.
 pub async fn alternative_request(cfg: &Config, id: Uuid, archetype: &str) -> Result<Value, String> {
-    let Some(row) = cfg
-        .pool
-        .fetch_optional("SELECT brief_json, (notes_json ->> 'seed')::bigint, concept_id FROM generations WHERE id = $1", args![id])
-        .await
-        .map_err(es)?
+    let Some(row) =
+        cfg.pool.fetch_optional("SELECT brief_json, notes_json, concept_id FROM generations WHERE id = $1", args![id]).await.map_err(es)?
     else {
         return Err(format!("generation {id} not found"));
     };
     let mut req: Value = row.get(0);
-    let seed: Option<i64> = row.get(1);
+    let seed = row.get::<Option<Value>, _>(1).and_then(|n| n["seed"].as_i64());
     let concept: Option<Uuid> = row.get(2);
     let o = req.as_object_mut().ok_or("stored request is not an object")?;
     o.insert("variants".into(), json!(1));
@@ -1417,17 +1439,21 @@ pub async fn shares(cfg: &Config, owner: Uuid) -> Result<Value, String> {
     let rows = cfg
         .pool
         .fetch_all(
-            "SELECT s.id, s.generation_id, s.concept_id, s.created_at, s.expires_at,
-                s.expires_at IS NOT NULL AND s.expires_at <= now(),
+            &format!(
+                "SELECT s.id, s.generation_id, s.concept_id, s.created_at, s.expires_at,
+                s.expires_at IS NOT NULL AND s.expires_at <= $2,
                 CASE WHEN s.concept_id IS NOT NULL THEN p.name || ' · ' || c.name
-                     ELSE COALESCE(g.page, g.notes_json #>> '{direction,label}', '#' || right(g.id::text, 8), 'deleted') END
+                     ELSE COALESCE(g.page, {}, {}, 'deleted') END
          FROM shares s
          LEFT JOIN concepts c ON c.id = s.concept_id
          LEFT JOIN projects p ON p.id = c.project_id
          LEFT JOIN generations g ON g.id = s.generation_id
          WHERE s.owner_id = $1
          ORDER BY s.created_at DESC, s.id DESC",
-            args![owner],
+                cfg.pool.json_text("g.notes_json", &["direction", "label"]),
+                short_label("g.id")
+            ),
+            args![owner, Utc::now()],
         )
         .await
         .map_err(es)?;
@@ -1465,8 +1491,8 @@ pub async fn shared_screens(cfg: &Config, token: &str) -> Result<Option<(String,
     let Some(row) = cfg
         .pool
         .fetch_optional(
-            "SELECT generation_id, concept_id FROM shares WHERE token_hash = $1 AND (expires_at IS NULL OR expires_at > now())",
-            args![sha256_hex(token)],
+            "SELECT generation_id, concept_id FROM shares WHERE token_hash = $1 AND (expires_at IS NULL OR expires_at > $2)",
+            args![sha256_hex(token), Utc::now()],
         )
         .await
         .map_err(es)?
@@ -1476,10 +1502,12 @@ pub async fn shared_screens(cfg: &Config, token: &str) -> Result<Option<(String,
     let generation: Option<Uuid> = row.get(0);
     let concept: Option<Uuid> = row.get(1);
     if let Some(gid) = generation {
-        let Some(row) = cfg.pool.fetch_optional("SELECT COALESCE(page, notes_json #>> '{direction,label}', '#' || right(id::text, 8), 'deleted'), html IS NOT NULL, target FROM generations WHERE id = $1", args![gid])
-            .await
-            .map_err(es)?
-        else {
+        let sql = format!(
+            "SELECT COALESCE(page, {}, {}, 'deleted'), html IS NOT NULL, target FROM generations WHERE id = $1",
+            cfg.pool.json_text("notes_json", &["direction", "label"]),
+            short_label("id")
+        );
+        let Some(row) = cfg.pool.fetch_optional(&sql, args![gid]).await.map_err(es)? else {
             return Ok(None);
         };
         let label: String = row.get(0);
@@ -1785,6 +1813,24 @@ mod tests {
 
         let stored = generation(&cfg, p).await.unwrap().unwrap();
         assert_eq!(stored["notes"]["batch"], json!(j1.to_string()));
+    }
+
+    #[tokio::test]
+    async fn deleting_nothing_is_a_no_op() {
+        let cfg = test_cfg().await;
+        assert_eq!(delete_generations(&cfg, &[]).await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn share_label_comes_from_the_direction() {
+        let cfg = test_cfg().await;
+        let g = add_gen(&cfg, None, None, "desktop", json!({"direction": {"label": "Calm"}})).await;
+        let (sid, token) = create_share(&cfg, LOCAL, Some(g), None, None).await.unwrap();
+        let list = shares(&cfg, LOCAL).await.unwrap();
+        let row = list.as_array().unwrap().iter().find(|s| s["id"] == json!(sid)).unwrap();
+        assert_eq!(row["label"], json!("Calm"));
+        let (title, _) = shared_screens(&cfg, &token).await.unwrap().unwrap();
+        assert_eq!(title, "Calm");
     }
 
     #[tokio::test]
