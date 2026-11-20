@@ -808,13 +808,10 @@ pub async fn active_jobs(cfg: &Config, owner: Uuid) -> Result<i64, String> {
 pub async fn job_target(cfg: &Config, id: Uuid) -> Result<Option<Value>, String> {
     let row = cfg
         .pool
-        .fetch_optional(
-            "SELECT json_build_object('concept', concept_id, 'page', page)::jsonb FROM generations WHERE id = $1 AND concept_id IS NOT NULL",
-            args![id],
-        )
+        .fetch_optional("SELECT concept_id, page FROM generations WHERE id = $1 AND concept_id IS NOT NULL", args![id])
         .await
         .map_err(es)?;
-    Ok(row.map(|r| r.get::<Value, _>(0)))
+    Ok(row.map(|r| json!({"concept": r.get::<Uuid, _>(0), "page": r.get::<Option<String>, _>(1)})))
 }
 
 fn job_json(r: &crate::sql::Row, with_log: bool) -> Value {
@@ -853,7 +850,7 @@ const JOB_COLS: &str = "SELECT j.id, j.kind, j.status, j.progress, j.log, j.crea
 
 /// The latest jobs of one owner, or of everyone when `owner` is None.
 pub async fn jobs(cfg: &Config, owner: Option<Uuid>) -> Result<Value, String> {
-    let sql = format!("{JOB_COLS} WHERE $1::uuid IS NULL OR j.owner_id = $1 ORDER BY j.created_at DESC, j.id DESC LIMIT 200");
+    let sql = format!("{JOB_COLS} WHERE $1 IS NULL OR j.owner_id = $1 ORDER BY j.created_at DESC, j.id DESC LIMIT 200");
     let rows = cfg.pool.fetch_all(&sql, args![owner]).await.map_err(es)?;
     Ok(Value::Array(rows.iter().map(|r| job_json(r, false)).collect()))
 }
@@ -898,9 +895,11 @@ impl JobQuery {
     }
 
     /// The ORDER BY expression of a sort key; unknown keys fall back to the start time (never user text in SQL).
-    fn order(&self) -> &'static str {
+    fn order(&self, sqlite: bool) -> &'static str {
         match self.sort.as_str() {
-            "duration" => "COALESCE(j.finished_at, now()) - j.created_at",
+            // $6 is the current time, bound by search_jobs for this key only; SQLite stores RFC 3339 text, so it subtracts julian days.
+            "duration" if sqlite => "julianday(COALESCE(j.finished_at, $6)) - julianday(j.created_at)",
+            "duration" => "COALESCE(j.finished_at, $6) - j.created_at",
             "cost" => "j.cost",
             "account" => "lower(COALESCE(u.name, u.email))",
             "tokens" => "j.prompt_tokens + j.out_tokens",
@@ -916,15 +915,20 @@ impl JobQuery {
 pub async fn search_jobs(cfg: &Config, q: &JobQuery) -> Result<Value, String> {
     let like = format!("%{}%", q.q.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_"));
     // $1 text, $2 kind; the status filter ($3) is applied separately so the counts per status ignore it.
-    let filter = "($1 = '%%' OR u.email ILIKE $1 OR COALESCE(u.name, '') ILIKE $1 OR j.kind ILIKE $1 OR j.id::text ILIKE $1)
-                  AND ($2::text IS NULL OR j.kind = $2)";
+    let filter = "($1 = '%%' OR lower(u.email) LIKE lower($1) ESCAPE '\\' OR lower(COALESCE(u.name, '')) LIKE lower($1) ESCAPE '\\'
+                   OR lower(j.kind) LIKE lower($1) ESCAPE '\\' OR lower(CAST(j.id AS TEXT)) LIKE lower($1) ESCAPE '\\')
+                  AND ($2 IS NULL OR j.kind = $2)";
     let dir = if q.asc { "ASC" } else { "DESC" };
     let sql = format!(
-        "{JOB_COLS} WHERE {filter} AND ($3::text IS NULL OR j.status = $3)
+        "{JOB_COLS} WHERE {filter} AND ($3 IS NULL OR j.status = $3)
          ORDER BY {} {dir} NULLS LAST, j.created_at DESC, j.id DESC LIMIT $4 OFFSET $5",
-        q.order()
+        q.order(cfg.pool.is_sqlite())
     );
-    let rows = cfg.pool.fetch_all(&sql, args![&like, q.kind.clone(), q.status.clone(), q.per, (q.page - 1) * q.per]).await.map_err(es)?;
+    let mut a = args![&like, q.kind.clone(), q.status.clone(), q.per, (q.page - 1) * q.per];
+    if q.sort == "duration" {
+        a.push(crate::sql::Arg::arg(Utc::now()));
+    }
+    let rows = cfg.pool.fetch_all(&sql, a).await.map_err(es)?;
     let counts_sql = format!("SELECT j.status, COUNT(*) FROM jobs j JOIN users u ON u.id = j.owner_id WHERE {filter} GROUP BY 1");
     let mut counts = json!({"all": 0, "queued": 0, "running": 0, "done": 0, "failed": 0});
     let mut all = 0i64;
@@ -940,9 +944,9 @@ pub async fn search_jobs(cfg: &Config, q: &JobQuery) -> Result<Value, String> {
     counts["all"] = json!(all);
     let kinds: Vec<String> =
         cfg.pool.fetch_all("SELECT DISTINCT kind FROM jobs ORDER BY 1", vec![]).await.map_err(es)?.iter().map(|r| r.get(0)).collect();
-    let d = cfg.pool.fetch_one("SELECT COUNT(*), COUNT(*) FILTER (WHERE status = 'failed'), COALESCE(SUM(llm_seconds), 0)::bigint, COALESCE(SUM(prompt_tokens), 0)::bigint,
-                COALESCE(SUM(cached_tokens), 0)::bigint, COALESCE(SUM(out_tokens), 0)::bigint, SUM(cost)
-         FROM jobs WHERE created_at >= now() - interval '24 hours'", vec![])
+    let d = cfg.pool.fetch_one("SELECT COUNT(*), COUNT(*) FILTER (WHERE status = 'failed'), CAST(COALESCE(SUM(llm_seconds), 0) AS BIGINT), CAST(COALESCE(SUM(prompt_tokens), 0) AS BIGINT),
+                CAST(COALESCE(SUM(cached_tokens), 0) AS BIGINT), CAST(COALESCE(SUM(out_tokens), 0) AS BIGINT), SUM(cost)
+         FROM jobs WHERE created_at >= $1", args![Utc::now() - chrono::Duration::hours(24)])
     .await
     .map_err(es)?;
     Ok(json!({
@@ -1734,12 +1738,33 @@ mod tests {
         assert_eq!((failed["total"].clone(), failed["counts"]["all"].clone()), (json!(1), json!(3)), "counts ignore the status filter");
         let none = search_jobs(&cfg, &JobQuery::parse(&format!("q={kind}_nobody"))).await.unwrap();
         assert_eq!(none["total"], json!(0));
+        let by_duration = search_jobs(&cfg, &JobQuery::parse(&format!("q={kind}&sort=duration"))).await.unwrap();
+        assert_eq!(by_duration["total"], json!(3), "unfinished jobs count up to now");
+    }
+
+    #[tokio::test]
+    async fn admin_job_search_ignores_case() {
+        let cfg = test_cfg().await;
+        let (alice, kind) = (Uuid::now_v7(), format!("k{}", Uuid::now_v7().simple()));
+        let email = format!("Alice{}@X.io", alice.simple());
+        cfg.pool.execute("INSERT INTO users (id, email, created_at) VALUES ($1, $2, $3)", args![alice, &email, Utc::now()]).await.unwrap();
+        cfg.pool
+            .execute(
+                "INSERT INTO jobs (id, kind, status, owner_id, created_at) VALUES ($1, $2, 'done', $3, $4)",
+                args![Uuid::now_v7(), &kind, alice, Utc::now()],
+            )
+            .await
+            .unwrap();
+        for q in [email.to_lowercase(), email.to_uppercase()] {
+            let r = search_jobs(&cfg, &JobQuery::parse(&format!("q={q}"))).await.unwrap();
+            assert_eq!(r["total"], json!(1), "search for {q}");
+        }
     }
 
     #[test]
     fn job_query_bounds_its_input() {
         let q = JobQuery::parse("page=-3&per=99999&sort=x;drop&dir=asc");
-        assert_eq!((q.page, q.per, q.asc, q.order()), (1, 200, true, "j.created_at"));
+        assert_eq!((q.page, q.per, q.asc, q.order(false)), (1, 200, true, "j.created_at"));
     }
 
     #[tokio::test]
