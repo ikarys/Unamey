@@ -9,6 +9,7 @@ mod models;
 mod pg;
 mod pipeline;
 mod share;
+mod sql;
 
 use std::sync::Arc;
 
