@@ -4,6 +4,7 @@ import { Folder, Sparkles } from 'lucide-react';
 import { api, type Generation, type Project } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import { ErrorRow } from '../components/ui';
+import { HelpButton } from '../components/Help';
 import { PromptBox } from '../components/PromptBox';
 import { previewDoc } from './Generate';
 import { fmtAgo, t, tn } from '../i18n';
@@ -133,7 +134,7 @@ export function Home() {
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-6xl px-8 py-10">
         <div className="mb-12">
-          <h1 className="text-[28px] font-bold tracking-tight text-ink">{t('home.title')}</h1>
+          <h1 className="flex items-center gap-2 text-[28px] font-bold tracking-tight text-ink">{t('home.title')} <HelpButton section="describe" /></h1>
           <p className="mb-5 mt-1 text-[14px] text-ink-2">{t('home.subtitle')}</p>
           <PromptBox onSetup={setSetup} />
         </div>

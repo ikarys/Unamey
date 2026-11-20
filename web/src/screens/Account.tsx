@@ -5,6 +5,7 @@ import { api } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import { useApp } from '../components/AppContext';
 import { Button, ErrorRow, Label, SkeletonRows, confirmDialog, inputCls } from '../components/ui';
+import { HelpButton } from '../components/Help';
 import { t, tn, fmtDate, fmtAgo, lang } from '../i18n';
 
 type Tab = 'profile' | 'security' | 'usage';
@@ -149,7 +150,7 @@ export function Account() {
   return (
     <div className="h-full overflow-y-auto">
       <div className="mx-auto max-w-3xl px-8 py-10">
-        <h1 className="text-[28px] font-bold tracking-tight">{t('account.title')}</h1>
+        <h1 className="flex items-center gap-2 text-[28px] font-bold tracking-tight">{t('account.title')} <HelpButton section="account" /></h1>
         <p className="mt-1 text-[14px] text-ink-2">{acc.data?.email ?? ''}</p>
 
         {acc.error && (
