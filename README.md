@@ -6,78 +6,17 @@ A mockup studio for apps built with coding agents. Describe the product, get sev
 
 The idea is to decide the design on screens you can see, before the agent writes code, instead of correcting it afterwards one prompt at a time. Single Rust binary (`studio`) with a React front, running on a local model or an API provider. Self-hosted, AGPL-3.0.
 
-![Home: describe the product, then pick a style](docs/screenshots/home.png)
-
-## What it does, honestly
-
-A strong coding agent (Claude Code with Opus and the `frontend-design` skill, say) already produces a clean, task-fit screen from a two-sentence brief. We measured it on three briefs: on a one-shot screen, Unamey's pack did not make the agent's screen better, and the local model's reference pages were weaker than what Opus drew on its own (`docs/reports/2026-11-19-agent-comparison.md`). So Unamey is not a better screen generator than Opus.
-
-What it gives you is a different workflow:
-
-- **Several concrete looks to choose from**, side by side, before any code exists. The agent gives you one answer; here you get a Swiss grid, a bento board and a dense console of the same product, and you pick.
-- **Rework on the mockup, not in the codebase**: change colours, fonts, radius, density or the layout of a screen, refine it bolder or quieter, add a variant in another style. Each step is a new screen you can compare with the previous one.
-- **One look for the whole app**: once a look is chosen, every further page (desktop and mobile) is generated on its shell, tokens and navigation. Consistency across screens is where agents drift.
-- **The decision as files**: the pack is a `SKILL.md`, a `tokens.css`, a reference page and one HTML per page. It travels between agents, sessions and people, and the agent copies a page instead of inventing one. In the test, that was the cheapest run of its series.
-- **Works on a local model.** Everything runs on a 27B model on your machine; an API provider only makes it faster.
-
-Whether this saves correction rounds on a real multi-screen project is the open question. The measurement is in progress, not a result; see the report for the protocol and the numbers.
-
-## Screens
-
-Sixteen styles, each with its layout, neutrals, hues, fonts and do / don't rules. Pick one, or let the planner propose three.
-
-![The sixteen styles](docs/screenshots/styles.png)
-
-Explore looks of one product, then set one as the project's look. The right column adjusts the tokens live (palette, fonts, radius, effects); the left one holds the brief.
+**Site: <https://ikarys.github.io/Unamey/>**, with the screens, the workflow and what a coding agent alone already does as well.
 
 ![Three looks of a padel club app](docs/screenshots/looks.png)
 
-Compare two screens side by side at the same zoom, pan both at once.
+## What it does, honestly
 
-![Compare side by side](docs/screenshots/compare.png)
-
-Generate the other pages on the chosen look: same shell, tokens and navigation, the look's page as the reference.
-
-![Pages of a project on one look](docs/screenshots/pages.png)
-
-Mobile pages are their own screens (390 px, bottom tab bar, 44 px targets), shown in a phone frame.
-
-![A mobile page](docs/screenshots/mobile.png)
-
-The gallery keeps every screen, grouped by project, filtered by verdict, style or text.
-
-![Gallery](docs/screenshots/gallery.png)
-
-Some generated pages, as they come out (local model, one shot, no retouch):
-
-| | |
-| --- | --- |
-| ![Editorial, a notes app](docs/screenshots/sample-editorial.png) | ![Comic zine, a padel club](docs/screenshots/sample-comic.png) |
-| ![Bento tiles, an ops dashboard](docs/screenshots/sample-bento.png) | ![Dense operator console, a seed bank](docs/screenshots/sample-seed-bank.png) |
-
-## How it works
-
-1. **Brief.** Type a description. One model call expands it into a brief (users, data objects, main task, density, style tags, suggested pages) that you review. Your own words stay binding: the expansion cannot narrow the scope, rename the product or drop a colour you asked for.
-2. **Plan.** For each variant, a planner picks one of 16 named structures from the brief (`prompts/structures.json`: master list + detail, board, timeline, dashboard, step flow, live console, record page, catalog...) and one of 16 styles (`prompts/archetypes.json`), different across variants, and writes a design direction: every object the brief names gets a visible region.
-3. **Draw.** The model writes a standalone HTML page (Tailwind CDN, inline SVG icons) following the direction and a layout vocabulary (`skill/app-layout-patterns`). Execution calls run at low reasoning effort since the structure is already decided. Optional: the `impeccable` skill counts finish defects.
-4. **Rework.** Verdict (good / mixed / bad), refine along one action (bolder, quieter, distill, typeset, colorize, layout), add a variant in another style with the same seed, edit tokens or give a layout-only instruction. Every result is a new screen next to the previous ones.
-5. **Pages.** Set a screen as the project's look, then type page names. Each page is generated on that look, desktop, mobile or both. A brief that mentions field use binds 14 px text and 48 px targets; a desktop app brief binds OS window conventions.
-6. **Pack.** Export the project pack and copy it into the app you are building.
-
-Share links (`/s/<token>`, read-only, revocable) let someone see a screen without an account. A PNG export renders a screen in a browser or phone frame.
+A strong coding agent (Claude Code with Opus and the `frontend-design` skill, say) already produces a clean, task-fit screen from a two-sentence brief, and on a one-shot screen Unamey's pack did not make it better (`docs/reports/2026-11-19-agent-comparison.md`). What Unamey gives you is a different workflow: several concrete looks to choose from before any code exists, rework on the mockup rather than in the codebase, one look carried across every page, desktop and mobile, and the decision handed to the agent as files. Whether this saves correction rounds on a real multi-screen project is the open question; the measurement is in progress.
 
 ## The pack
 
-`packs/<project>/`:
-
-- `SKILL.md`: product description, the chosen style and structure, a `## Shell` section (the chrome to keep on every screen, in the generator's words), design tokens, do / don't rules, and the list of pages with their briefs.
-- `tokens.css`: the tokens as CSS variables, plus the `--success`, `--warning` and `--danger` colours read from the reference page.
-- `reference.html`: the look's page, the one to imitate.
-- `pages/<page>.html` and `pages/<page>.mobile.html`: one standalone page per screen.
-
-A single screen can be exported the same way (`packs/<id>-<slug>/`, without `pages/`).
-
-Copy the pack to `<app>/.claude/skills/ui-pack/` and ask the coding agent to build the screens following that skill. It gets the style, the tokens and the pages to copy.
+`packs/<project>/`: `SKILL.md` (product, chosen style and structure, shell, tokens, do / don't rules, pages), `tokens.css`, `reference.html` (the look's page) and `pages/<page>.html` / `pages/<page>.mobile.html`. Copy it to `<app>/.claude/skills/ui-pack/` and ask the coding agent to build the screens following that skill.
 
 ## Requirements
 
