@@ -2,7 +2,6 @@
 
 use crate::config::Config;
 use serde_json::{Value, json};
-use sqlx::Row;
 use std::collections::HashMap;
 
 /// Sums the Prometheus samples of the cache metrics by name (labels ignored, except kv: pool 0 only).
@@ -53,7 +52,7 @@ fn parse_call(line: &str) -> Option<Value> {
 /// Build the admin cache view from server metrics and recent jobs.
 pub fn view(cfg: &Config) -> Result<Value, String> {
     let sql = "SELECT id, kind, status, created_at, log FROM jobs WHERE log LIKE '%llm: %' ORDER BY created_at DESC, id DESC LIMIT 30";
-    let rows = cfg.block(sqlx::query(sql).fetch_all(&cfg.pool)).map_err(crate::db::es)?;
+    let rows = cfg.block(cfg.pool.fetch_all(sql, vec![])).map_err(crate::db::es)?;
     let jobs: Vec<Value> = rows
         .iter()
         .map(|row| {

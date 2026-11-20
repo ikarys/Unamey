@@ -10,7 +10,7 @@ follows Vibecoding Convention level 1
 
 | Requirement | How it is checked |
 |---|---|
-| Pipeline behaviour: brief validation, planner structures and archetypes, prompts, patch edits, tokens, packs | `just test` (Rust unit and DB tests on PostgreSQL, then `tsc --noEmit` on the web front) |
+| Pipeline behaviour: brief validation, planner structures and archetypes, prompts, patch edits, tokens, packs | `just test` (Rust unit and DB tests, run twice: on SQLite, then on PostgreSQL; then `tsc --noEmit` on the web front) |
 | Clean code | `cargo clippy -- -D warnings`, `cargo fmt --check` |
 | No secrets in the history | `gitleaks git` |
 | User isolation in multi-user mode | Owner-scoped queries, tests listed in [SECURITY.md](SECURITY.md) |

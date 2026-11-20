@@ -171,10 +171,8 @@ struct Parent {
 }
 
 fn load(cfg: &Config, id: Uuid) -> Result<Parent, String> {
-    let g = cfg
-        .block(get::<_, models::Generation>(&cfg.pool, &SqlValue::Uuid(id)))
-        .map_err(es)?
-        .ok_or_else(|| format!("no generation #{id}"))?;
+    let g =
+        cfg.block(cfg.pool.get::<models::Generation>(&SqlValue::Uuid(id))).map_err(es)?.ok_or_else(|| format!("no generation #{id}"))?;
     let html = g.html.map(|h| h.0).filter(|h| !h.is_empty()).ok_or("generation has no HTML")?;
     let notes = g.notes_json.map(|n| n.0).unwrap_or_default();
     if !notes["direction"].is_object() {
