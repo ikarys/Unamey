@@ -40,7 +40,7 @@ just lint         # clippy
 just dev-reset    # drop the dev data
 ```
 
-`just dev` needs the dev PostgreSQL (`just db` applies the migrations) and works on `dev-skill/`, copied once from the shipped skill. Open the app once `cargo` has finished compiling; before that, `/api` answers 503. The database starts empty: set a provider in Settings (click the model name in the top bar). `just setup` installs the rango CLI once.
+`just dev` needs the dev PostgreSQL (`just db` applies the migrations) and works on `dev-skill/`, copied once from the shipped skill. Open the app once `cargo` has finished compiling; before that, `/api` answers 503. The database starts empty: set a provider in Settings (click the model name in the top bar). The Help button in the top bar opens the user guide inside the app, in English or French; the same guide is published at <https://ikarys.github.io/Unamey/help.html>. `just setup` installs the rango CLI once.
 
 The server binds to `127.0.0.1` by default; `GET /healthz` answers `ok` without auth. Generated HTML is previewed in iframes with `sandbox="allow-scripts"` only, never `allow-same-origin`.
 
