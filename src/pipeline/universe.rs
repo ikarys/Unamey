@@ -127,6 +127,12 @@ mod tests {
     }
 
     #[test]
+    fn prompt_answers_in_the_brief_language() {
+        // A French brief once came back with English universes; the prompt must ask for the brief's language.
+        assert!(PROMPT.contains("in the language the PRODUCT description is written in"));
+    }
+
+    #[test]
     fn validate_checks_each_field() {
         assert!(validate(&json!({"text": "a notes app"})).is_ok());
         assert!(validate(&json!({})).is_err());
