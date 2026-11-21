@@ -137,8 +137,25 @@ async fn handle(State(cfg): State<Arc<Config>>, rq: Request) -> Response {
                     Err(_) => respond(500, "text/plain", b"error".as_slice(), &[]),
                 }
             }
-            [token, "llms.txt"] => match share::llms(&cfg, token).await {
+            [token, "llms.txt"] => match share::llms(&cfg, token, &share::base(cfg.origin.as_deref(), get_header(h, "host"))).await {
                 Ok(Some(text)) => respond(200, "text/plain; charset=utf-8", text.into_bytes(), &share::page_headers()),
+                Ok(None) => respond(404, "text/plain", GONE, &share::page_headers()),
+                Err(_) => respond(500, "text/plain", b"error".as_slice(), &[]),
+            },
+            [token, "pack.zip"] => match shared_pack(&cfg, token).await {
+                Ok(Some((name, bytes))) => {
+                    let disposition = format!("attachment; filename=\"{name}-ui-pack.zip\"");
+                    respond(
+                        200,
+                        "application/zip",
+                        bytes,
+                        &[
+                            ("content-disposition", disposition.as_str()),
+                            ("cache-control", "no-store"),
+                            ("x-robots-tag", "noindex, nofollow"),
+                        ],
+                    )
+                }
                 Ok(None) => respond(404, "text/plain", GONE, &share::page_headers()),
                 Err(_) => respond(500, "text/plain", b"error".as_slice(), &[]),
             },
@@ -410,6 +427,24 @@ async fn pack_zip(c: &Arc<Config>, actor: &Actor, concept: bool, i: &str) -> Res
         Ok((p.name.clone(), pack::zip(&p).map_err(internal)?))
     })
     .await?
+}
+
+/// The pack of what a live share token points at (same scope as its screens), or None for a dead token.
+async fn shared_pack(c: &Arc<Config>, token: &str) -> Result<Option<(String, Vec<u8>)>, String> {
+    let Some((generation, concept)) = db::share_scope(c, token).await? else {
+        return Ok(None);
+    };
+    let c = c.clone();
+    tokio::task::spawn_blocking(move || {
+        let p = match (generation, concept) {
+            (Some(g), _) => pack::generation(&c, g)?,
+            (None, Some(k)) => pack::concept(&c, k)?,
+            (None, None) => return Ok(None),
+        };
+        Ok(Some((p.name.clone(), pack::zip(&p)?)))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// The generation framed as a PNG (see `showcase`).
@@ -909,6 +944,37 @@ mod tests {
         let parent_body = serde_json::to_vec(&json!({"brief": "x", "parent": g.clone()})).unwrap();
         let r = route(&cfg, &b, &Method::POST, &["generate"], "", &parent_body).await;
         assert_eq!(r.as_ref().err().map(|e| e.0), Some(400), "POST generate parent");
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn a_share_token_serves_its_pack_and_nothing_once_revoked() {
+        let cfg = test_cfg().await;
+        let local = Uuid::from_u128(1);
+        let v = db::create_project(&cfg, local, "P").await.unwrap();
+        let concept: Uuid = serde_json::from_value(v["concept"].clone()).unwrap();
+        let gid = db::insert_generation(
+            &cfg,
+            db::NewGeneration {
+                request: &json!({"brief": "b"}),
+                notes: &json!({"direction": {}}),
+                html: "<p>x</p>",
+                skill_version: "v",
+                project: None,
+                concept: Some(concept),
+                page: None,
+                target: "desktop",
+                owner: local,
+                model: "m",
+            },
+        )
+        .await
+        .unwrap();
+        let (sid, token) = db::create_share(&cfg, local, Some(gid), None, None).await.unwrap();
+        let (_, zip) = shared_pack(&cfg, &token).await.unwrap().expect("pack of a live share");
+        assert!(zip.starts_with(b"PK"), "a zip archive");
+        assert!(shared_pack(&cfg, &"0".repeat(64)).await.unwrap().is_none());
+        assert!(db::revoke_share(&cfg, local, sid).await.unwrap());
+        assert!(shared_pack(&cfg, &token).await.unwrap().is_none(), "a revoked token serves nothing");
     }
 
     #[tokio::test]

@@ -123,4 +123,4 @@ SQLite transactions open with `BEGIN IMMEDIATE`, so two read-then-write transact
 
 ## Agent access
 
-Done (2026-11-21): `/s/<token>/llms.txt` on every share link. Decided against, for now: a stored universe per project (pages already inherit it through the identity tokens) and API tokens / an MCP server (a new authentication surface; share links cover read-only agent access).
+Done (2026-11-21): `/s/<token>/llms.txt` on every share link, with absolute URLs and the pack (`/s/<token>/pack.zip`); the chosen universe is kept with each generation's request. Next: read-only personal API tokens, then a small MCP server on top.

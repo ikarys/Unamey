@@ -1484,11 +1484,12 @@ pub struct SharedScreen {
     pub target: String,
 }
 
-pub async fn shared_screens(cfg: &Config, token: &str) -> Result<Option<(String, Vec<SharedScreen>)>, String> {
+/// What a live share token points at: (generation, concept), or None for a malformed, unknown, revoked or expired token.
+pub async fn share_scope(cfg: &Config, token: &str) -> Result<Option<(Option<Uuid>, Option<Uuid>)>, String> {
     if token.len() != 64 || !token.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f')) {
         return Ok(None);
     }
-    let Some(row) = cfg
+    Ok(cfg
         .pool
         .fetch_optional(
             "SELECT generation_id, concept_id FROM shares WHERE token_hash = $1 AND (expires_at IS NULL OR expires_at > $2)",
@@ -1496,11 +1497,13 @@ pub async fn shared_screens(cfg: &Config, token: &str) -> Result<Option<(String,
         )
         .await
         .map_err(es)?
-    else {
+        .map(|row| (row.get(0), row.get(1))))
+}
+
+pub async fn shared_screens(cfg: &Config, token: &str) -> Result<Option<(String, Vec<SharedScreen>)>, String> {
+    let Some((generation, concept)) = share_scope(cfg, token).await? else {
         return Ok(None);
     };
-    let generation: Option<Uuid> = row.get(0);
-    let concept: Option<Uuid> = row.get(1);
     if let Some(gid) = generation {
         let sql = format!(
             "SELECT COALESCE(page, {}, {}, 'deleted'), html IS NOT NULL, target FROM generations WHERE id = $1",

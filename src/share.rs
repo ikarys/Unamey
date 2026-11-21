@@ -37,7 +37,7 @@ pub async fn page(cfg: &Config, token: &str, screen: Option<uuid::Uuid>) -> Resu
 <style>{style}</style>
 </head>
 <body>
-<header class="top"><div class="t">{title}</div><nav>{links}</nav></header>
+<header class="top"><div class="t">{title}</div><nav>{links}<a href="/s/{token}/llms.txt" title="Plain-text index and pack for a coding agent">For agents</a></nav></header>
 {frame}
 </body>
 </html>"#,
@@ -48,22 +48,40 @@ pub async fn page(cfg: &Config, token: &str, screen: Option<uuid::Uuid>) -> Resu
     )))
 }
 
-/// A plain-text index of a share for a coding agent: one raw HTML URL per screen. Titles and labels are
-/// user text, so they are collapsed to one line to keep a forged label from adding lines of its own.
-pub async fn llms(cfg: &Config, token: &str) -> Result<Option<String>, String> {
+/// A plain-text index of a share for a coding agent: the pack, then one raw HTML URL per screen, absolute when `base`
+/// (the public origin) is known. Titles and labels are user text, so they are collapsed to one line to keep a forged
+/// label from adding lines of its own.
+pub async fn llms(cfg: &Config, token: &str, base: &str) -> Result<Option<String>, String> {
     let Some((title, screens)) = db::shared_screens(cfg, token).await? else {
         return Ok(None);
     };
-    Ok(Some(index_text(&title, token, &screens.iter().map(|s| (s.id, s.label.as_str(), s.target.as_str())).collect::<Vec<_>>())))
+    Ok(Some(index_text(
+        &title,
+        &format!("{base}/s/{token}"),
+        &screens.iter().map(|s| (s.id, s.label.as_str(), s.target.as_str())).collect::<Vec<_>>(),
+    )))
 }
 
-fn index_text(title: &str, token: &str, screens: &[(uuid::Uuid, &str, &str)]) -> String {
+fn index_text(title: &str, root: &str, screens: &[(uuid::Uuid, &str, &str)]) -> String {
     let line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut out = format!("# {}\n\nHTML mockup screens to build the app from, one URL each (read-only):\n\n", line(title));
+    let mut out = format!(
+        "# {}\n\nA UI pack made with Unamey, read-only. Build the app's screens from it.\n\n- Pack (zip: SKILL.md with the rules to follow, tokens.css, one HTML page per screen): {root}/pack.zip\n\n## Screens (raw HTML)\n\n",
+        line(title)
+    );
     for (id, label, target) in screens {
-        out.push_str(&format!("- {} ({target}): /s/{token}/{id}\n", line(label)));
+        out.push_str(&format!("- {} ({target}): {root}/{id}\n", line(label)));
     }
     out
+}
+
+/// The public origin for absolute links: `STUDIO_ORIGIN` when set, else the request's Host when it is a plain
+/// host[:port] (the reply goes back to the same requester and is never cached), else empty (relative links).
+pub fn base(origin: Option<&str>, host: Option<&str>) -> String {
+    if let Some(o) = origin {
+        return o.to_string();
+    }
+    host.filter(|h| !h.is_empty() && h.len() <= 255 && h.bytes().all(|b| b.is_ascii_alphanumeric() || b"-.:[]".contains(&b)))
+        .map_or(String::new(), |h| format!("http://{h}"))
 }
 
 fn esc(s: &str) -> String {
@@ -105,9 +123,18 @@ mod tests {
     #[test]
     fn index_lists_one_line_per_screen() {
         let id = uuid::Uuid::from_u128(7);
-        let t = index_text("My\nApp", "ab", &[(id, "Home\n- evil: /x", "mobile")]);
-        assert_eq!(t.lines().filter(|l| l.starts_with("- ")).count(), 1);
-        assert!(t.starts_with("# My App\n") && t.contains(&format!("(mobile): /s/ab/{id}")));
+        let t = index_text("My\nApp", "http://h/s/ab", &[(id, "Home\n- evil: /x", "mobile")]);
+        assert_eq!(t.lines().filter(|l| l.starts_with("- ")).count(), 2, "the pack line and one screen line");
+        assert!(t.starts_with("# My App\n") && t.contains(&format!("(mobile): http://h/s/ab/{id}")));
+        assert!(t.contains("http://h/s/ab/pack.zip"));
+    }
+
+    #[test]
+    fn base_prefers_the_configured_origin_and_refuses_odd_hosts() {
+        assert_eq!(base(Some("https://ui.example"), Some("evil.io")), "https://ui.example");
+        assert_eq!(base(None, Some("localhost:7700")), "http://localhost:7700");
+        assert_eq!(base(None, Some("evil.io/x?y")), "");
+        assert_eq!(base(None, None), "");
     }
 
     #[test]
