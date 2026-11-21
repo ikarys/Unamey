@@ -120,3 +120,7 @@ SQLite with no Docker; Postgres stays the deployment target and `just test` runs
 written once in the common dialect (`src/sql.rs` holds the two spellings that differ: JSON paths and month buckets).
 No data moves between the two: a deployment that switches backends starts empty.
 SQLite transactions open with `BEGIN IMMEDIATE`, so two read-then-write transactions queue instead of one failing.
+
+## Agent access
+
+Done (2026-11-21): `/s/<token>/llms.txt` on every share link. Decided against, for now: a stored universe per project (pages already inherit it through the identity tokens) and API tokens / an MCP server (a new authentication surface; share links cover read-only agent access).
