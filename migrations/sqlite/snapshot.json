@@ -1,5 +1,105 @@
 {
   "tables": {
+    "settings": {
+      "columns": [
+        {
+          "name": "key",
+          "col_type": "text",
+          "nullable": false,
+          "primary_key": true,
+          "unique": true,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "value",
+          "col_type": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": false,
+          "references": null
+        }
+      ],
+      "constraints": []
+    },
+    "users": {
+      "columns": [
+        {
+          "name": "id",
+          "col_type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "unique": true,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "email",
+          "col_type": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "name",
+          "col_type": "text",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "admin",
+          "col_type": "bool",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": "false",
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "disabled",
+          "col_type": "bool",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": "false",
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "password_hash",
+          "col_type": "text",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "created_at",
+          "col_type": "datetime",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": "now()",
+          "index": false,
+          "references": null
+        }
+      ],
+      "constraints": []
+    },
     "concepts": {
       "columns": [
         {
@@ -239,6 +339,162 @@
         {
           "name": "jobs_status",
           "definition": "CHECK (status IN ('queued','running','done','failed'))"
+        }
+      ]
+    },
+    "projects": {
+      "columns": [
+        {
+          "name": "id",
+          "col_type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "unique": true,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "name",
+          "col_type": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "owner_id",
+          "col_type": "uuid",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": true,
+          "references": {
+            "table": "users",
+            "column": "id",
+            "on_delete": "cascade"
+          }
+        },
+        {
+          "name": "created_at",
+          "col_type": "datetime",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": "now()",
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "archived_at",
+          "col_type": "datetime",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": false,
+          "references": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "projects_owner_name",
+          "definition": "UNIQUE (\"owner_id\", \"name\")"
+        }
+      ]
+    },
+    "shares": {
+      "columns": [
+        {
+          "name": "id",
+          "col_type": "uuid",
+          "nullable": false,
+          "primary_key": true,
+          "unique": true,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "token_hash",
+          "col_type": "text",
+          "nullable": false,
+          "primary_key": false,
+          "unique": true,
+          "default": null,
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "owner_id",
+          "col_type": "uuid",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": true,
+          "references": {
+            "table": "users",
+            "column": "id",
+            "on_delete": "cascade"
+          }
+        },
+        {
+          "name": "generation_id",
+          "col_type": "uuid",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": true,
+          "references": {
+            "table": "generations",
+            "column": "id",
+            "on_delete": "cascade"
+          }
+        },
+        {
+          "name": "concept_id",
+          "col_type": "uuid",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": true,
+          "references": {
+            "table": "concepts",
+            "column": "id",
+            "on_delete": "cascade"
+          }
+        },
+        {
+          "name": "created_at",
+          "col_type": "datetime",
+          "nullable": false,
+          "primary_key": false,
+          "unique": false,
+          "default": "now()",
+          "index": false,
+          "references": null
+        },
+        {
+          "name": "expires_at",
+          "col_type": "datetime",
+          "nullable": true,
+          "primary_key": false,
+          "unique": false,
+          "default": null,
+          "index": false,
+          "references": null
+        }
+      ],
+      "constraints": [
+        {
+          "name": "shares_one_target",
+          "definition": "CHECK ((generation_id IS NULL) <> (concept_id IS NULL))"
         }
       ]
     },
@@ -487,171 +743,7 @@
         }
       ]
     },
-    "users": {
-      "columns": [
-        {
-          "name": "id",
-          "col_type": "uuid",
-          "nullable": false,
-          "primary_key": true,
-          "unique": true,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "email",
-          "col_type": "text",
-          "nullable": false,
-          "primary_key": false,
-          "unique": true,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "name",
-          "col_type": "text",
-          "nullable": true,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "admin",
-          "col_type": "bool",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": "false",
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "disabled",
-          "col_type": "bool",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": "false",
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "password_hash",
-          "col_type": "text",
-          "nullable": true,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "created_at",
-          "col_type": "datetime",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": "now()",
-          "index": false,
-          "references": null
-        }
-      ],
-      "constraints": []
-    },
-    "settings": {
-      "columns": [
-        {
-          "name": "key",
-          "col_type": "text",
-          "nullable": false,
-          "primary_key": true,
-          "unique": true,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "value",
-          "col_type": "text",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": false,
-          "references": null
-        }
-      ],
-      "constraints": []
-    },
-    "projects": {
-      "columns": [
-        {
-          "name": "id",
-          "col_type": "uuid",
-          "nullable": false,
-          "primary_key": true,
-          "unique": true,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "name",
-          "col_type": "text",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "owner_id",
-          "col_type": "uuid",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": true,
-          "references": {
-            "table": "users",
-            "column": "id",
-            "on_delete": "cascade"
-          }
-        },
-        {
-          "name": "created_at",
-          "col_type": "datetime",
-          "nullable": false,
-          "primary_key": false,
-          "unique": false,
-          "default": "now()",
-          "index": false,
-          "references": null
-        },
-        {
-          "name": "archived_at",
-          "col_type": "datetime",
-          "nullable": true,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": false,
-          "references": null
-        }
-      ],
-      "constraints": [
-        {
-          "name": "projects_owner_name",
-          "definition": "UNIQUE (\"owner_id\", \"name\")"
-        }
-      ]
-    },
-    "shares": {
+    "api_tokens": {
       "columns": [
         {
           "name": "id",
@@ -674,7 +766,7 @@
           "references": null
         },
         {
-          "name": "owner_id",
+          "name": "user_id",
           "col_type": "uuid",
           "nullable": false,
           "primary_key": false,
@@ -688,32 +780,14 @@
           }
         },
         {
-          "name": "generation_id",
-          "col_type": "uuid",
-          "nullable": true,
+          "name": "name",
+          "col_type": "text",
+          "nullable": false,
           "primary_key": false,
           "unique": false,
           "default": null,
-          "index": true,
-          "references": {
-            "table": "generations",
-            "column": "id",
-            "on_delete": "cascade"
-          }
-        },
-        {
-          "name": "concept_id",
-          "col_type": "uuid",
-          "nullable": true,
-          "primary_key": false,
-          "unique": false,
-          "default": null,
-          "index": true,
-          "references": {
-            "table": "concepts",
-            "column": "id",
-            "on_delete": "cascade"
-          }
+          "index": false,
+          "references": null
         },
         {
           "name": "created_at",
@@ -726,7 +800,7 @@
           "references": null
         },
         {
-          "name": "expires_at",
+          "name": "last_used",
           "col_type": "datetime",
           "nullable": true,
           "primary_key": false,
@@ -736,12 +810,7 @@
           "references": null
         }
       ],
-      "constraints": [
-        {
-          "name": "shares_one_target",
-          "definition": "CHECK ((generation_id IS NULL) <> (concept_id IS NULL))"
-        }
-      ]
+      "constraints": []
     }
   }
 }

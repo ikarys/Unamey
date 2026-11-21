@@ -36,6 +36,7 @@ export interface Status {
 export interface Me { id: string; admin: boolean; can_admin: boolean; multi_user: boolean }
 export interface Account { email: string; name: string | null; admin: boolean; created_at: string }
 export interface Session { id: string; user_agent: string | null; created_at: string; last_seen: string | null; current: boolean }
+export interface ApiToken { id: string; name: string; created_at: string; last_used: string | null }
 export interface Usage { month: { generations: number; projects: number }; total: { generations: number; projects: number }; by_month: { month: string; generations: number }[] }
 export interface UserDetail { usage: Usage; projects: Project[]; sessions: Session[]; jobs: Job[] }
 export interface User { id: string; email: string; name: string | null; admin: boolean; disabled: boolean; created_at: string; generations_month: number; generations_total: number; cost_month: number | null }
@@ -165,6 +166,9 @@ export const api = {
   sessions: () => req<Session[]>('/api/account/sessions'),
   revokeSession: (id: string) => req<{ ok: true }>(`/api/account/sessions/${id}`, { method: 'DELETE' }),
   revokeOtherSessions: () => req<{ revoked: number }>('/api/account/sessions/revoke-others', json('POST', {})),
+  apiTokens: () => req<ApiToken[]>('/api/account/tokens'),
+  createApiToken: (name: string) => req<{ id: string; token: string }>('/api/account/tokens', json('POST', { name })),
+  revokeApiToken: (id: string) => req<{ ok: true }>(`/api/account/tokens/${id}`, { method: 'DELETE' }),
   usage: () => req<Usage>('/api/account/usage'),
   login: (email: string, password: string) => req<{ ok: true }>('/api/login', json('POST', { email, password })),
   signup: (name: string, email: string, password: string) => req<{ ok: true }>('/api/signup', json('POST', { name, email, password })),

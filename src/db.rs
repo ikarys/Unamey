@@ -417,6 +417,82 @@ pub async fn revoke_other_sessions(cfg: &Config, user_id: Uuid, keep_token: &str
     Ok(n)
 }
 
+/// Prefix of personal API tokens, so secret scanners and a reader can tell them from a session.
+const API_TOKEN_PREFIX: &str = "unamey_";
+const MAX_API_TOKENS: i64 = 20;
+
+/// Who a personal API token acts as. Never as admin: a token is read-only on the owner's own content.
+pub async fn api_token_actor(cfg: &Config, token: &str) -> Result<Option<Actor>, String> {
+    let Some(raw) = token.strip_prefix(API_TOKEN_PREFIX) else { return Ok(None) };
+    if raw.len() != 64 || !raw.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Ok(None);
+    }
+    let hash = sha256_hex(token);
+    let row = cfg
+        .pool
+        .fetch_optional(
+            "SELECT u.id FROM api_tokens t JOIN users u ON u.id = t.user_id WHERE t.token_hash = $1 AND u.disabled = $2",
+            args![&hash, false],
+        )
+        .await
+        .map_err(es)?;
+    let Some(r) = row else { return Ok(None) };
+    let now = Utc::now();
+    cfg.pool
+        .execute(
+            "UPDATE api_tokens SET last_used = $2 WHERE token_hash = $1 AND (last_used IS NULL OR last_used < $3)",
+            args![&hash, now, now - SESSION_TOUCH],
+        )
+        .await
+        .map_err(es)?;
+    Ok(Some(Actor { id: r.get::<Uuid, _>(0), admin: false }))
+}
+
+/// A new token for `user_id`; the clear token is returned once and only its hash is kept.
+pub async fn create_api_token(cfg: &Config, user_id: Uuid, name: &str) -> Result<(Uuid, String), String> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > 60 {
+        return Err("name the token (1 to 60 characters)".into());
+    }
+    let n: i64 = cfg.pool.fetch_one("SELECT COUNT(*) FROM api_tokens WHERE user_id = $1", args![user_id]).await.map_err(es)?.get(0);
+    if n >= MAX_API_TOKENS {
+        return Err(format!("at most {MAX_API_TOKENS} tokens; revoke one first"));
+    }
+    let token = format!("{API_TOKEN_PREFIX}{}", new_token()?);
+    let id = Uuid::now_v7();
+    let t = models::ApiToken {
+        id: FieldUuid(id),
+        token_hash: FieldText(sha256_hex(&token)),
+        user_id: ForeignKey::new(user_id),
+        name: FieldText(name.into()),
+        created_at: now(),
+        last_used: None,
+    };
+    cfg.pool.insert(t).await.map_err(es)?;
+    Ok((id, token))
+}
+
+pub async fn api_tokens(cfg: &Config, user_id: Uuid) -> Result<Value, String> {
+    let rows = cfg
+        .pool
+        .fetch_all("SELECT id, name, created_at, last_used FROM api_tokens WHERE user_id = $1 ORDER BY created_at DESC", args![user_id])
+        .await
+        .map_err(es)?;
+    Ok(Value::Array(
+        rows.into_iter()
+            .map(|r| {
+                let (id, name, created_at, last_used): (Uuid, String, DateTime<Utc>, Option<DateTime<Utc>>) =
+                    (r.get(0), r.get(1), r.get(2), r.get(3));
+                json!({"id": id, "name": name, "created_at": ts(created_at), "last_used": last_used.map(ts)})
+            })
+            .collect(),
+    ))
+}
+
+pub async fn revoke_api_token(cfg: &Config, user_id: Uuid, id: Uuid) -> Result<bool, String> {
+    Ok(cfg.pool.execute("DELETE FROM api_tokens WHERE id = $1 AND user_id = $2", args![id, user_id]).await.map_err(es)? > 0)
+}
+
 pub async fn admin_delete_user(cfg: &Config, actor_id: Uuid, user_id: Uuid) -> Result<bool, String> {
     if user_id == ADMIN {
         return Err("the admin account cannot be deleted".into());
@@ -2050,6 +2126,32 @@ mod tests {
         assert_eq!(owner_of(&cfg, "projects", p2).await.unwrap(), None);
         assert_eq!(session(&cfg, &tb1).await.unwrap(), None);
         assert!(admin_delete_user(&cfg, LOCAL, LOCAL).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn api_tokens_are_hashed_read_only_and_revocable() {
+        let cfg = test_cfg().await;
+        let other = Uuid::now_v7();
+        cfg.pool.execute("INSERT INTO users (id, email, created_at) VALUES ($1, 'b', $2)", args![other, Utc::now()]).await.unwrap();
+        assert!(create_api_token(&cfg, LOCAL, "  ").await.is_err());
+        assert!(create_api_token(&cfg, LOCAL, &"x".repeat(61)).await.is_err());
+
+        let (tid, token) = create_api_token(&cfg, LOCAL, "claude code").await.unwrap();
+        assert!(token.starts_with("unamey_"));
+        let stored: String = cfg.pool.fetch_one("SELECT token_hash FROM api_tokens WHERE id = $1", args![tid]).await.unwrap().get(0);
+        assert_eq!(stored, sha256_hex(&token), "only the token's hash is stored");
+        assert_eq!(api_token_actor(&cfg, &token).await.unwrap(), Some(Actor { id: LOCAL, admin: false }), "an admin's token is not admin");
+        assert_eq!(api_token_actor(&cfg, &token[7..]).await.unwrap(), None, "the prefix is part of the token");
+        assert_eq!(api_token_actor(&cfg, &format!("unamey_{}", "0".repeat(64))).await.unwrap(), None);
+        assert_eq!(api_tokens(&cfg, LOCAL).await.unwrap()[0]["name"], "claude code");
+        assert_eq!(api_tokens(&cfg, other).await.unwrap(), json!([]));
+
+        assert!(!revoke_api_token(&cfg, other, tid).await.unwrap(), "another user cannot revoke it");
+        cfg.pool.execute("UPDATE users SET disabled = $1 WHERE id = $2", args![true, LOCAL]).await.unwrap();
+        assert_eq!(api_token_actor(&cfg, &token).await.unwrap(), None, "a disabled account's tokens stop working");
+        cfg.pool.execute("UPDATE users SET disabled = $1 WHERE id = $2", args![false, LOCAL]).await.unwrap();
+        assert!(revoke_api_token(&cfg, LOCAL, tid).await.unwrap());
+        assert_eq!(api_token_actor(&cfg, &token).await.unwrap(), None, "a revoked token stops working");
     }
 
     #[tokio::test]

@@ -24,6 +24,14 @@ A strong coding agent (Claude Code with Opus and the `frontend-design` skill, sa
 
 A share link (`/s/<token>`, read-only, revocable, optional expiry) also serves `/s/<token>/llms.txt` (linked as "For agents" on the share page): a plain-text index with the absolute URL of the pack (`/s/<token>/pack.zip`: SKILL.md, tokens.css, one HTML page per screen) and one raw HTML URL per screen, so a coding agent such as Claude Code or GPT can fetch the mockups itself. It uses the same token as the share page, no new access, but note that whoever holds the link can now also download the pack, brief included. The URLs use `STUDIO_ORIGIN` in multi-user mode, the request's `Host` otherwise.
 
+For an agent working on your own projects without a share link, use an API token and the MCP server. In multi-user mode, Account → Security → "API tokens" creates a personal token (`unamey_…`, shown once). It sends `Authorization: Bearer <token>` and can only read: `GET` on your own projects, concepts and generations, never the account or admin routes. The token is stored hashed and stops working when revoked, when the account is disabled or deleted. Changing the password does not revoke it. `POST /api/mcp` is a small read-only MCP server (tools `list_projects`, `list_screens`, `get_screen`, `get_pack`):
+
+```sh
+claude mcp add --transport http unamey https://studio.example.com/api/mcp --header "Authorization: Bearer unamey_…"
+```
+
+In single-user mode there are no tokens: `http://127.0.0.1:7700/api/mcp` answers without one, behind the same local-origin check as the rest of the API.
+
 ## Requirements
 
 - Rust stable, Node 20+, `just`.
