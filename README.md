@@ -22,7 +22,7 @@ A strong coding agent (Claude Code with Opus and the `frontend-design` skill, sa
 
 ## Handing screens to an agent
 
-A share link (`/s/<token>`, read-only, revocable, optional expiry) also serves `/s/<token>/llms.txt`: a plain-text list with one raw HTML URL per screen, so a coding agent such as Claude Code or GPT can fetch the mockups itself. It uses the same token as the share page, no new access.
+A share link (`/s/<token>`, read-only, revocable, optional expiry) also serves `/s/<token>/llms.txt` (linked as "For agents" on the share page): a plain-text index with the absolute URL of the pack (`/s/<token>/pack.zip`: SKILL.md, tokens.css, one HTML page per screen) and one raw HTML URL per screen, so a coding agent such as Claude Code or GPT can fetch the mockups itself. It uses the same token as the share page, no new access, but note that whoever holds the link can now also download the pack, brief included. The URLs use `STUDIO_ORIGIN` in multi-user mode, the request's `Host` otherwise.
 
 ## Requirements
 

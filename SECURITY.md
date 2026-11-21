@@ -48,6 +48,8 @@ per-user job cap.
 | Titles and labels on share pages are HTML-escaped; the showcase page escapes the screen into its frame | `share::tests::esc_escapes`, `pipeline::showcase::tests::page_escapes_the_screen` |
 | Wrong passwords are refused, a password change revokes the other sessions, a signed-out session no longer works | `db::tests::accounts_and_ownership` |
 | A share link serves only the screens it was created for, and stops working once revoked or expired | `db::tests::share_links` |
+| A share link also serves the pack of what it was created for (`/s/<token>/pack.zip`: SKILL.md with the brief, chosen style and tokens, plus the screens), and nothing once revoked or expired; the token scope is checked by `db::share_scope` before any read (information exposure, IDOR) | `http::tests::a_share_token_serves_its_pack_and_nothing_once_revoked`, `db::tests::share_links` |
+| `llms.txt` reflects the `Host` header only when `STUDIO_ORIGIN` is unset, and only if it holds host characters (header injection) | `share::tests::base_prefers_the_configured_origin_and_refuses_odd_hosts` |
 | Share screens get an opaque origin (`sandbox allow-scripts` CSP, sandboxed iframe) | `share::tests::screens_get_an_opaque_origin`, `db::tests::share_links` |
 | Local origin check in single-user mode | **untested** |
 | SQL parameterisation | partial: `db::tests::job_query_bounds_its_input`; the rest relies on binds |
