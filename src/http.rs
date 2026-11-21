@@ -137,6 +137,11 @@ async fn handle(State(cfg): State<Arc<Config>>, rq: Request) -> Response {
                     Err(_) => respond(500, "text/plain", b"error".as_slice(), &[]),
                 }
             }
+            [token, "llms.txt"] => match share::llms(&cfg, token).await {
+                Ok(Some(text)) => respond(200, "text/plain; charset=utf-8", text.into_bytes(), &share::page_headers()),
+                Ok(None) => respond(404, "text/plain", GONE, &share::page_headers()),
+                Err(_) => respond(500, "text/plain", b"error".as_slice(), &[]),
+            },
             [token, gid] => {
                 let gid = match gid.parse::<Uuid>() {
                     Ok(g) => g,

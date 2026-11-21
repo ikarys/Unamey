@@ -48,6 +48,24 @@ pub async fn page(cfg: &Config, token: &str, screen: Option<uuid::Uuid>) -> Resu
     )))
 }
 
+/// A plain-text index of a share for a coding agent: one raw HTML URL per screen. Titles and labels are
+/// user text, so they are collapsed to one line to keep a forged label from adding lines of its own.
+pub async fn llms(cfg: &Config, token: &str) -> Result<Option<String>, String> {
+    let Some((title, screens)) = db::shared_screens(cfg, token).await? else {
+        return Ok(None);
+    };
+    Ok(Some(index_text(&title, token, &screens.iter().map(|s| (s.id, s.label.as_str(), s.target.as_str())).collect::<Vec<_>>())))
+}
+
+fn index_text(title: &str, token: &str, screens: &[(uuid::Uuid, &str, &str)]) -> String {
+    let line = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut out = format!("# {}\n\nHTML mockup screens to build the app from, one URL each (read-only):\n\n", line(title));
+    for (id, label, target) in screens {
+        out.push_str(&format!("- {} ({target}): /s/{token}/{id}\n", line(label)));
+    }
+    out
+}
+
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;").replace('\'', "&#39;")
 }
@@ -82,6 +100,14 @@ mod tests {
     #[test]
     fn esc_escapes() {
         assert_eq!(esc("a<b>&\"'"), "a&lt;b&gt;&amp;&quot;&#39;");
+    }
+
+    #[test]
+    fn index_lists_one_line_per_screen() {
+        let id = uuid::Uuid::from_u128(7);
+        let t = index_text("My\nApp", "ab", &[(id, "Home\n- evil: /x", "mobile")]);
+        assert_eq!(t.lines().filter(|l| l.starts_with("- ")).count(), 1);
+        assert!(t.starts_with("# My App\n") && t.contains(&format!("(mobile): /s/ab/{id}")));
     }
 
     #[test]

@@ -20,6 +20,10 @@ A strong coding agent (Claude Code with Opus and the `frontend-design` skill, sa
 
 `packs/<project>/`: `SKILL.md` (product, chosen style and structure, shell, tokens, do / don't rules, pages), `tokens.css`, `reference.html` (the look's page) and `pages/<page>.html` / `pages/<page>.mobile.html`. Copy it to `<app>/.claude/skills/ui-pack/` and ask the coding agent to build the screens following that skill.
 
+## Handing screens to an agent
+
+A share link (`/s/<token>`, read-only, revocable, optional expiry) also serves `/s/<token>/llms.txt`: a plain-text list with one raw HTML URL per screen, so a coding agent such as Claude Code or GPT can fetch the mockups itself. It uses the same token as the share page, no new access.
+
 ## Requirements
 
 - Rust stable, Node 20+, `just`.
