@@ -10,6 +10,8 @@ For each universe:
 - materials: 2-4 short words for surfaces and details (paper, brushed steel, ruled lines, glass tube).
 - risk: one sentence on how this universe could look cliché or hurt usability, honestly.
 
+Write name, metaphor, pitch, materials and risk in the language the PRODUCT description is written in; keep the JSON keys in English.
+
 {steer}Never repeat these names: {avoid}.
 
 PRODUCT:
