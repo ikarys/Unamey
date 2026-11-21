@@ -170,9 +170,9 @@ pub fn start(cfg: &Config, job: &Job, request: Value, project: uuid::Uuid, conce
         job.log(&format!("project not renamed: {e}"));
     }
     req["concept"] = json!(concept);
+    // Kept as its own field, not folded into `colours`: the stored request is replayed by Add variant, where colours is capped at 200 chars.
     if let Some(u) = request_universe {
-        let asked = req["colours"].as_str().unwrap_or("").trim().to_string();
-        req["colours"] = json!(if asked.is_empty() { universe::colours(&u) } else { format!("{asked}. {}", universe::colours(&u)) });
+        req["universe"] = u;
     }
     if let Some(t) = chosen {
         req["target"] = json!(t);

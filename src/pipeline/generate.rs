@@ -320,7 +320,7 @@ pub(crate) fn user_message(req: &Value, direction: Option<&Value>, reference: Op
             "\n\nUSER'S OWN WORDS (binding: where the brief and these words differ, these words win; keep their scope, product name and constraints):\n{d}"
         );
     }
-    if let Some(c) = req["colours"].as_str().map(str::trim).filter(|c| !c.is_empty()) {
+    if let Some(c) = colours(req) {
         msg += &format!("\n\nCOLOURS (binding, the user's request; it overrides the archetype's hue family and the ban list): {c}");
     }
     if field::is_field(req) {
@@ -408,6 +408,16 @@ pub fn parse_answer(text: &str) -> Result<(Value, String, bool), String> {
 }
 
 /// One screen, or `variants` (2-3) screens with structurally different directions, stored as one batch. A request with `parent: <generation id>` joins that generation's batch (an "alternative"). A request with a `page` name is generated under its concept's identity (see `run_page`). `target` is `desktop` (default), `mobile` or `both` (desktop then mobile, using the desktop HTML as reference).
+/// The binding colour request: the user's words, then the chosen visual universe (already rebuilt by `universe::clean`).
+fn colours(req: &Value) -> Option<String> {
+    let asked = req["colours"].as_str().map(str::trim).filter(|c| !c.is_empty()).map(String::from);
+    let world = (!req["universe"].is_null()).then(|| crate::pipeline::universe::colours(&req["universe"]));
+    match (asked, world) {
+        (Some(a), Some(w)) => Some(format!("{a}. {w}")),
+        (a, w) => a.or(w),
+    }
+}
+
 pub fn run(cfg: &Config, job: &Job, request: Value) -> Result<Value, String> {
     if let Some(page) = request["page"].as_str().map(str::trim).filter(|p| !p.is_empty()) {
         return run_page(cfg, job, &request, page);
@@ -427,7 +437,7 @@ pub fn run(cfg: &Config, job: &Job, request: Value) -> Result<Value, String> {
     let looks: Vec<String> =
         request["looks"].as_array().map_or(Vec::new(), |a| a.iter().filter_map(|v| v.as_str().map(String::from)).collect());
     let picks = seed_picks(seed, n, &list(&request["style_tags"]), request["archetype"].as_str(), &looks)?;
-    let user_colours = request["colours"].as_str().is_some_and(|c| !c.trim().is_empty());
+    let user_colours = colours(&request).is_some();
     let picks_text: String = picks
         .iter()
         .enumerate()
@@ -887,6 +897,14 @@ mod tests {
         assert!(user_message(&json!({"brief": "b"}), Some(&d), None).contains("STRUCTURE \"Board\""));
         let d = json!({"label": "A · x", "direction": "d", "archetype": ARCHETYPES[0].clone(), "structure": Value::Null, "identity": {}});
         assert!(!user_message(&json!({"brief": "b"}), Some(&d), None).contains("STRUCTURE \""));
+    }
+
+    #[test]
+    fn a_universe_reaches_the_colours_without_touching_the_colours_field() {
+        let u = json!({"name": "Night market", "metaphor": "m", "pitch": "p", "palette": ["#000000", "#111111", "#eeeeee", "#ff0000", "#00ff00"], "materials": [], "risk": ""});
+        let m = user_message(&json!({"brief": "b", "colours": "no grey", "universe": u}), None, None);
+        assert!(m.contains("COLOURS") && m.contains("no grey. Visual universe \"Night market\""));
+        assert!(user_message(&json!({"brief": "b"}), None, None).find("COLOURS").is_none());
     }
 
     #[test]

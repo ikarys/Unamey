@@ -209,6 +209,8 @@ export const fr: Record<keyof typeof en, string> = {
   'generate.form.brief': 'Brief',
   'generate.form.projectBriefPlaceholder': 'Brief du projet',
   'generate.form.users': 'Utilisateurs',
+  'generate.form.universe': 'Univers : {name}',
+  'generate.form.universeDrop': 'Retirer',
   'generate.form.colours': 'Couleurs',
   'generate.form.coloursPlaceholder': 'Vos souhaits de couleurs (ex. couleurs franches, pas de gris) · vide = le style décide',
   'generate.form.dataObjectsPlaceholder': 'Objets de données : un par ligne ou séparés par des virgules',

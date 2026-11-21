@@ -98,7 +98,7 @@ export interface Concept { id: string; name: string; identity: string | null; ge
 export interface Project { id: string; name: string; created_at: string; generations: number; archived: boolean; concepts: Concept[] }
 export interface Share { id: string; generation_id: string | null; concept_id: string | null; created_at: string; expires_at: string | null; expired: boolean; label: string }
 export interface GenerateRequest {
-  brief: string; description?: string; colours?: string; users: string; data_objects: string[]; style_tags: string[]; density: string; variants?: number; seed?: number; archetype?: string; concept?: string; page?: string; target?: 'desktop' | 'mobile' | 'both'; pages?: string[]; looks?: string[]; /** Stored on page generations: the identity generation they were built on. */ identity?: string;
+  brief: string; description?: string; colours?: string; users: string; data_objects: string[]; style_tags: string[]; density: string; variants?: number; seed?: number; archetype?: string; concept?: string; page?: string; target?: 'desktop' | 'mobile' | 'both'; pages?: string[]; looks?: string[]; /** Stored on page generations: the identity generation they were built on. */ identity?: string; /** The visual universe picked on the home page, replayed by Add variant. */ universe?: Universe;
 }
 export interface BriefDraft { brief: string; users: string; data_objects: string[]; style_tags: string[]; density: string; pages: string[]; looks: string[]; colours: string; description?: string }
 /** The home flow: a free prompt, the look (archetype id, omitted = the planner proposes), 1-3 variants, theme, and an existing project + empty concept (omitted = new project). */
