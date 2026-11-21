@@ -144,6 +144,20 @@ pub struct Share {
     pub expires_at: Option<FieldDateTime>,
 }
 
+/// A read-only personal API token for agents (MCP, scripts); only its hash is stored.
+#[derive(Model)]
+#[model(table = "api_tokens")]
+pub struct ApiToken {
+    pub id: FieldUuid,
+    #[field(unique)]
+    pub token_hash: FieldText,
+    pub user_id: ForeignKey<User>,
+    pub name: FieldText,
+    #[field(auto_now_add)]
+    pub created_at: FieldDateTime,
+    pub last_used: Option<FieldDateTime>,
+}
+
 #[derive(Model)]
 #[model(table = "settings")]
 pub struct Setting {

@@ -337,6 +337,7 @@ pub(crate) use args;
 const SQLITE_MIGRATIONS: &[(&str, &str)] = &[
     ("0001_auto", include_str!("../migrations/sqlite/0001_auto.sql")),
     ("0002_local_user", include_str!("../migrations/sqlite/0002_local_user.sql")),
+    ("0003_api_tokens", include_str!("../migrations/sqlite/0003_api_tokens.sql")),
 ];
 
 /// Applies the pending SQLite migrations, recorded in the same `_rango_migrations` table the rango CLI uses, one transaction per file.
@@ -629,6 +630,7 @@ mod tests {
             include_str!("../migrations/0004_jobs.sql"),
             include_str!("../migrations/0005_users.sql"),
             include_str!("../migrations/0006_jobs.sql"),
+            include_str!("../migrations/0007_api_tokens.sql"),
         ];
         let lite_files: Vec<&str> = SQLITE_MIGRATIONS.iter().map(|(_, sql)| *sql).collect();
         let (pg_idx, lite_idx) = (indexes(&pg_files, &pg), indexes(&lite_files, &lite));

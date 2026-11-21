@@ -123,4 +123,4 @@ SQLite transactions open with `BEGIN IMMEDIATE`, so two read-then-write transact
 
 ## Agent access
 
-Done (2026-11-21): `/s/<token>/llms.txt` on every share link, with absolute URLs and the pack (`/s/<token>/pack.zip`); the chosen universe is kept with each generation's request. Next: read-only personal API tokens, then a small MCP server on top.
+Done (2026-11-21): `/s/<token>/llms.txt` on every share link, with absolute URLs and the pack (`/s/<token>/pack.zip`); the chosen universe is kept with each generation's request. Read-only personal API tokens (Account → Security) and a read-only MCP server on `/api/mcp`.

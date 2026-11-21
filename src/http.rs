@@ -230,7 +230,14 @@ async fn handle(State(cfg): State<Arc<Config>>, rq: Request) -> Response {
         }
         return respond_json(Ok(json!({"ok": true})), &[("set-cookie", &set_cookie(&cfg, "", 0))]);
     }
-    let actor = if cfg.multi_user() {
+    let bearer = get_header(h, "authorization").and_then(|v| v.strip_prefix("Bearer "));
+    let actor = if let Some(t) = bearer {
+        match db::api_token_actor(&cfg, t).await {
+            Ok(Some(a)) => a,
+            Ok(None) => return respond_json(Err((401, "invalid token".into())), &[]),
+            Err(e) => return respond_json(Err(internal(e)), &[]),
+        }
+    } else if cfg.multi_user() {
         let t = match cookie_token(h) {
             Some(t) => t,
             None => return respond_json(Err((401, "sign in".into())), &[]),
@@ -243,6 +250,9 @@ async fn handle(State(cfg): State<Arc<Config>>, rq: Request) -> Response {
     } else {
         authz::LOCAL
     };
+    if bearer.is_some() && !authz::token_may(method.as_str(), segs[0]) {
+        return respond_json(Err((403, "read-only token".into())), &[]);
+    }
     let real_admin = actor.admin;
     let actor = authz::view_as(actor, get_header(h, "x-view-as") == Some("member"));
     if let (&Method::GET, ["me"]) = (&method, segs.as_slice()) {
@@ -322,6 +332,22 @@ async fn handle(State(cfg): State<Arc<Config>>, rq: Request) -> Response {
                     Err(e) => respond_json(Err(internal(e)), &[]),
                 }
             }
+            (&Method::GET, ["account", "tokens"]) => respond_json(db::api_tokens(&cfg, actor.id).await.map_err(internal), &[]),
+            (&Method::POST, ["account", "tokens"]) => {
+                let b = match json_body(&body) {
+                    Ok(b) => b,
+                    Err(e) => return respond_json(Err(e), &[]),
+                };
+                let out = db::create_api_token(&cfg, actor.id, b["name"].as_str().unwrap_or("")).await;
+                respond_json(out.map(|(id, token)| json!({"id": id, "token": token})).map_err(bad), &[("cache-control", "no-store")])
+            }
+            (&Method::DELETE, ["account", "tokens", i]) => {
+                let out = match id(i) {
+                    Ok(i) => db::revoke_api_token(&cfg, actor.id, i).await.map_err(internal),
+                    Err(e) => Err(e),
+                };
+                respond_json(out.and_then(|ok| if ok { Ok(json!({"ok": true})) } else { Err(not_found()) }), &[])
+            }
             (&Method::GET, ["account", "usage"]) => match db::usage(&cfg, actor.id).await {
                 Ok(v) => respond_json(Ok(v), &[]),
                 Err(e) => respond_json(Err(internal(e)), &[]),
@@ -346,6 +372,12 @@ async fn handle(State(cfg): State<Arc<Config>>, rq: Request) -> Response {
                 respond(200, "image/png", bytes, &[("content-disposition", &format!("attachment; filename=\"screen-{gid}-showcase.png\""))])
             }
             Err(e) => respond_json(Err(e), &[]),
+        };
+    }
+    if let (&Method::POST, ["mcp"]) = (&method, segs.as_slice()) {
+        return match crate::mcp::handle(&cfg, &actor, &body).await {
+            Some(v) => respond(200, "application/json", v.to_string(), &[]),
+            None => respond(202, "application/json", Vec::<u8>::new(), &[]),
         };
     }
     let out = route(&cfg, &actor, &method, &segs, query, &body).await;
@@ -420,13 +452,20 @@ async fn list_provider_models(cfg: &Arc<Config>, b: &Value) -> Res {
 
 /// The pack of a concept (from its identity) or of one generation, zipped under `ui-pack/`; the name is a slug, safe in a header.
 async fn pack_zip(c: &Arc<Config>, actor: &Actor, concept: bool, i: &str) -> Result<(String, Vec<u8>), (u16, String)> {
+    let p = owned_pack(c, actor, concept, i).await?;
+    blocking(move || Ok((p.name.clone(), pack::zip(&p).map_err(internal)?))).await?
+}
+
+/// The pack of the actor's concept or generation (404 if not theirs).
+pub(crate) async fn owned_pack(c: &Arc<Config>, actor: &Actor, concept: bool, i: &str) -> Result<pack::Pack, (u16, String)> {
     let i = if concept { owned_concept(c, actor, id(i)?).await?.1 } else { owned(c, actor, "generations", id(i)?).await? };
     let c = c.clone();
-    blocking(move || {
-        let p = if concept { pack::concept(&c, i) } else { pack::generation(&c, i) }.map_err(bad)?;
-        Ok((p.name.clone(), pack::zip(&p).map_err(internal)?))
-    })
-    .await?
+    blocking(move || if concept { pack::concept(&c, i) } else { pack::generation(&c, i) }.map_err(bad)).await?
+}
+
+/// A GET through the normal routes and ownership checks, for the MCP tools.
+pub(crate) async fn read(cfg: &Arc<Config>, actor: &Actor, segs: &[&str]) -> Res {
+    route(cfg, actor, &Method::GET, segs, "", &[]).await
 }
 
 /// The pack of what a live share token points at (same scope as its screens), or None for a dead token.
@@ -944,6 +983,87 @@ mod tests {
         let parent_body = serde_json::to_vec(&json!({"brief": "x", "parent": g.clone()})).unwrap();
         let r = route(&cfg, &b, &Method::POST, &["generate"], "", &parent_body).await;
         assert_eq!(r.as_ref().err().map(|e| e.0), Some(400), "POST generate parent");
+    }
+
+    #[tokio::test]
+    async fn an_api_token_reads_its_owners_content_and_writes_nothing() {
+        let mut cfg = Config::new(crate::sql::test_db().await, tokio::runtime::Handle::current(), 0);
+        cfg.origin = Some("https://studio.example".into());
+        let cfg = Arc::new(cfg);
+        let (alice, bob) = (Uuid::now_v7(), Uuid::now_v7());
+        for (u, e) in [(alice, "a@x.io"), (bob, "b@x.io")] {
+            cfg.pool
+                .execute("INSERT INTO users (id, email, created_at) VALUES ($1, $2, $3)", crate::sql::args![u, e, chrono::Utc::now()])
+                .await
+                .unwrap();
+        }
+        db::create_project(&cfg, alice, "Alice's").await.unwrap();
+        let v = db::create_project(&cfg, bob, "Bob's").await.unwrap();
+        let bob_gen = db::insert_generation(
+            &cfg,
+            db::NewGeneration {
+                request: &json!({"brief": "b"}),
+                notes: &json!({}),
+                html: "<p>secret</p>",
+                skill_version: "v",
+                project: None,
+                concept: Some(serde_json::from_value(v["concept"].clone()).unwrap()),
+                page: None,
+                target: "desktop",
+                owner: bob,
+                model: "m",
+            },
+        )
+        .await
+        .unwrap();
+        let (_, token) = db::create_api_token(&cfg, alice, "agent").await.unwrap();
+        let call = |method: &str, path: &str, auth: Option<String>, body: Value| {
+            let cfg = cfg.clone();
+            let mut rq = Request::builder().method(method).uri(path).header("host", "studio.example");
+            if let Some(a) = auth {
+                rq = rq.header("authorization", a);
+            }
+            let rq = rq.body(Body::from(body.to_string())).unwrap();
+            async move {
+                let r = handle(State(cfg), rq).await;
+                let status = r.status().as_u16();
+                (status, serde_json::from_slice::<Value>(&to_bytes(r.into_body(), 1 << 20).await.unwrap()).unwrap_or(Value::Null))
+            }
+        };
+        let bearer = Some(format!("Bearer {token}"));
+
+        let (st, projects) = call("GET", "/api/projects", bearer.clone(), json!(null)).await;
+        assert_eq!(st, 200);
+        assert_eq!(projects.as_array().unwrap().len(), 1, "only the owner's projects");
+        assert_eq!(projects[0]["name"], "Alice's");
+        assert_eq!(call("GET", "/api/projects", Some("Bearer unamey_nope".into()), json!(null)).await.0, 401);
+        assert_eq!(call("POST", "/api/projects", bearer.clone(), json!({"name": "x"})).await.0, 403, "a token cannot write");
+        assert_eq!(call("DELETE", &format!("/api/generations/{bob_gen}"), bearer.clone(), json!(null)).await.0, 403);
+        assert_eq!(call("GET", "/api/account/tokens", bearer.clone(), json!(null)).await.0, 403, "a token cannot see the account");
+        assert_eq!(call("POST", "/api/account/tokens", bearer.clone(), json!({"name": "more"})).await.0, 403, "a token cannot mint tokens");
+        assert_eq!(call("GET", "/api/users", bearer.clone(), json!(null)).await.0, 403);
+        assert_eq!(call("GET", &format!("/api/generations/{bob_gen}"), bearer.clone(), json!(null)).await.0, 404);
+
+        let mcp = |body: Value| call("POST", "/api/mcp", bearer.clone(), body);
+        let (st, init) = mcp(json!({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-06-18"}})).await;
+        assert_eq!((st, init["result"]["protocolVersion"].as_str()), (200, Some("2025-06-18")));
+        assert_eq!(mcp(json!({"jsonrpc": "2.0", "method": "notifications/initialized"})).await.0, 202);
+        let (_, list) =
+            mcp(json!({"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "list_projects", "arguments": {}}})).await;
+        let text = list["result"]["content"][0]["text"].as_str().unwrap();
+        assert!(text.contains("Alice's") && !text.contains("Bob's"));
+        let (_, other) =
+            mcp(json!({"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "get_screen", "arguments": {"id": bob_gen}}}))
+                .await;
+        assert_eq!(other["result"]["isError"], true);
+        assert_eq!(other["result"]["content"][0]["text"], "not found", "another user's screen stays hidden");
+        let (_, unknown) = mcp(json!({"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "delete_all"}})).await;
+        assert_eq!(unknown["error"]["code"], -32602);
+        assert_eq!(
+            call("POST", "/api/mcp", None, json!({"jsonrpc": "2.0", "id": 5, "method": "ping"})).await.0,
+            401,
+            "multi-user MCP needs a credential"
+        );
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -31,7 +31,8 @@ src/
                       (generate.rs `is_desktop_app`: desktop-app briefs get prompts/desktop_app.md, the OS window-chrome rules)
     pack.rs           generation → packs[/<project-slug>]/<id>-<slug>/{SKILL.md, reference.html}; project → packs/<project-slug>/{SKILL.md, reference.html, pages/<page-slug>.html, pages/<page-slug>.mobile.html}
   jobs.rs             background jobs on tokio's blocking pool, state in the `jobs` table
-  http.rs             axum server, JSON routes, share pages, static files from web/dist, `/healthz`
+  http.rs             axum server, JSON routes, share pages, static files from web/dist, `/healthz`; `Authorization: Bearer unamey_…` resolves a read-only API token (`db::api_token_actor`, gated by `authz::token_may`: GET outside account and admin prefixes, plus `POST /api/mcp`)
+  mcp.rs              read-only MCP server on `POST /api/mcp` (streamable HTTP, JSON answers only): tools list_projects, list_screens, get_screen, get_pack, each served through the same owned GET routes
 prompts/              generate.md, directions.md, refine.md, edit.md, patch.md, brief.md, mobile.md, desktop_app.md, archetypes.json, structures.json, skill_head.md (include_str!)
 migrations/            SQL generated from models.rs for PostgreSQL (with snapshot.json); migrations/sqlite/ the same for SQLite
 type_aliases.json

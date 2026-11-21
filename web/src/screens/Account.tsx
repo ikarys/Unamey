@@ -6,6 +6,7 @@ import { useAsync } from '../hooks/useAsync';
 import { useApp } from '../components/AppContext';
 import { Button, ErrorRow, Label, SkeletonRows, confirmDialog, inputCls } from '../components/ui';
 import { HelpButton } from '../components/Help';
+import { ApiTokens } from '../components/ApiTokens';
 import { t, tn, fmtDate, fmtAgo, lang } from '../i18n';
 
 type Tab = 'profile' | 'security' | 'usage';
@@ -349,6 +350,9 @@ export function Account() {
                         )}
                       </>
                     )}
+                  </Card>
+                  <Card title={t('account.apiTokens')} hint={t('account.apiTokensHint')}>
+                    <ApiTokens />
                   </Card>
                 </div>
               )}

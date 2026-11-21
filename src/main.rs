@@ -5,6 +5,7 @@ mod db;
 mod http;
 mod jobs;
 mod llm;
+mod mcp;
 mod models;
 mod pipeline;
 mod share;

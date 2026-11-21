@@ -27,6 +27,12 @@ pub fn can_access(a: &Actor, owner_id: Uuid) -> bool {
     a.id == owner_id
 }
 
+/// What a personal API token may reach: reads, plus the MCP endpoint (whose tools only read), never the
+/// account (a token cannot mint tokens or list sessions) nor the admin prefixes.
+pub fn token_may(method: &str, first_segment: &str) -> bool {
+    (method == "GET" || (method == "POST" && first_segment == "mcp")) && first_segment != "account" && !ADMIN_ONLY.contains(&first_segment)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -59,5 +65,16 @@ mod tests {
         assert!(!can_access(&member, LOCAL.id));
         assert!(can_access(&LOCAL, LOCAL.id));
         assert!(!can_access(&LOCAL, member.id));
+    }
+
+    #[test]
+    fn tokens_only_read() {
+        assert!(token_may("GET", "generations"));
+        assert!(token_may("POST", "mcp"));
+        assert!(!token_may("POST", "generations"));
+        assert!(!token_may("DELETE", "shares"));
+        assert!(!token_may("GET", "account"));
+        assert!(!token_may("POST", "account"));
+        assert!(!token_may("GET", "settings"));
     }
 }
