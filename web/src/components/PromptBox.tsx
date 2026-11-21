@@ -1,11 +1,12 @@
 // The home prompt box in two steps: a free description, then a horizontal setup stepper for project, style and options.
 import { Fragment, useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Folder, Loader2, Lock, Maximize2, Pencil, Plus, Sparkles } from 'lucide-react';
-import { api, type Archetype } from '../api';
+import { api, type Archetype, type Universe } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import { useApp } from './AppContext';
 import { t, tn, fmtAgo, look as lookText } from '../i18n';
 import { ImageZoom } from './ui';
+import { UniversePicker } from './UniversePicker';
 
 const EXAMPLES = [
   t('prompt.exampleCrm'),
@@ -46,6 +47,7 @@ export function PromptBox({ onSetup, fixed, initialText }: { onSetup?: (open: bo
   useEffect(() => onSetup?.(step === 'setup'), [step, onSetup]);
   const [text, setText] = useState(initialText?.slice(0, 2000) ?? '');
   const [look, setLook] = useState(() => new URLSearchParams(location.hash.split('?')[1] ?? '').get('look') ?? '');
+  const [universe, setUniverse] = useState<Universe | null>(null);
   const [theme, setTheme] = useState<Theme>('auto');
   const [target, setTarget] = useState<Target>('auto');
   const [variants, setVariants] = useState(() =>
@@ -93,6 +95,7 @@ export function PromptBox({ onSetup, fixed, initialText }: { onSetup?: (open: bo
         project: project || undefined,
         concept: project ? concept : undefined,
         look: look || undefined,
+        universe: universe ?? undefined,
         theme,
         target,
       });
@@ -297,6 +300,7 @@ export function PromptBox({ onSetup, fixed, initialText }: { onSetup?: (open: bo
 
         {setupStep === 2 && (
             <div>
+              <UniversePicker text={text.trim()} value={universe} onChange={setUniverse} />
               <div className="mb-2 flex items-center justify-between">
                 <h3 id="style-heading" className="text-[12px] font-semibold uppercase tracking-wide text-ink-3">
                   {t('prompt.style')}

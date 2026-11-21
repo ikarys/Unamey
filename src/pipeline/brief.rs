@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::db;
 use crate::jobs::Job;
 use crate::llm;
-use crate::pipeline::generate;
+use crate::pipeline::{generate, universe};
 use serde_json::{Value, json};
 use std::time::Instant;
 
@@ -160,6 +160,7 @@ pub fn start(cfg: &Config, job: &Job, request: Value, project: uuid::Uuid, conce
     let text = request["text"].as_str().unwrap_or("").to_string();
     // The user's choice on the home page wins; `auto` (or nothing) takes what the brief read from the description.
     let chosen = request["target"].as_str().filter(|t| matches!(*t, "desktop" | "mobile")).map(String::from);
+    let request_universe = request.get("universe").and_then(universe::clean);
     let mut req = run(cfg, job, request)?;
     if rename
         && let Some(name) = req["name"].as_str().filter(|n| !n.is_empty())
@@ -169,6 +170,10 @@ pub fn start(cfg: &Config, job: &Job, request: Value, project: uuid::Uuid, conce
         job.log(&format!("project not renamed: {e}"));
     }
     req["concept"] = json!(concept);
+    if let Some(u) = request_universe {
+        let asked = req["colours"].as_str().unwrap_or("").trim().to_string();
+        req["colours"] = json!(if asked.is_empty() { universe::colours(&u) } else { format!("{asked}. {}", universe::colours(&u)) });
+    }
     if let Some(t) = chosen {
         req["target"] = json!(t);
     }
