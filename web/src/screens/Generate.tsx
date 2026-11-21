@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type ReactNode } from 'react';
 import { Archive, Check, ChevronDown, ChevronRight, Columns3, Copy, Hand, Download, Fingerprint, FolderInput, ImageDown, ImagePlus, Link, Maximize2, Monitor, PanelLeftClose, PanelLeftOpen, PanelRightClose, PanelRightOpen, Plus, Share2, Smartphone, Sparkles, Trash2, Wand2, X } from 'lucide-react';
-import { api, shortId, REFINE_ACTIONS, REFINE_HINTS, type Archetype, type BriefDraft, type Concept, type EditRequest, type GenerateRequest, type Generation, type Job, type Project, type RefineAction, type Share, type Verdict } from '../api';
+import { api, shortId, REFINE_ACTIONS, REFINE_HINTS, type Archetype, type BriefDraft, type Concept, type EditRequest, type GenerateRequest, type Generation, type Job, type Project, type RefineAction, type Share, type Universe, type Verdict } from '../api';
 import { useAsync } from '../hooks/useAsync';
 import { useJob } from '../hooks/useJob';
 import { useApp } from '../components/AppContext';
@@ -168,7 +168,7 @@ export function Generate() {
   const projects = useAsync(api.projects, []);
   const [newProject, setNewProject] = useState<string | null>(null);
   const [mode, setMode] = useState<'look' | 'pages'>('pages');
-  const [form, setForm] = useState<{ brief: string; users: string; data_objects: string; style_tags: string; density: string; variants: number; seed: string; archetype: string; project: string | null; concept: string | null; page: string; target: 'desktop' | 'mobile' | 'both'; pages: string[]; looks: string[]; describe: string; colours: string }>({ brief: '', users: '', data_objects: '', style_tags: '', density: 'compact', variants: 1, seed: '', archetype: 'auto', project: new URLSearchParams(location.hash.split('?')[1]).get('project') || null, concept: new URLSearchParams(location.hash.split('?')[1]).get('concept') || null, page: '', target: 'desktop', pages: [], looks: [], describe: '', colours: '' });
+  const [form, setForm] = useState<{ brief: string; users: string; data_objects: string; style_tags: string; density: string; variants: number; seed: string; archetype: string; project: string | null; concept: string | null; page: string; target: 'desktop' | 'mobile' | 'both'; pages: string[]; looks: string[]; describe: string; colours: string; universe: Universe | null }>({ brief: '', users: '', data_objects: '', style_tags: '', density: 'compact', variants: 1, seed: '', archetype: 'auto', project: new URLSearchParams(location.hash.split('?')[1]).get('project') || null, concept: new URLSearchParams(location.hash.split('?')[1]).get('concept') || null, page: '', target: 'desktop', pages: [], looks: [], describe: '', colours: '', universe: null });
   // `#/generate?job=N&project=P&concept=C` (from the prompt page): follow that job in its concept.
   const [job, setJob] = useState<string | null>(() => new URLSearchParams(location.hash.split('?')[1]).get('job') || null);
   // The project the running job writes into, so it can be found again after browsing elsewhere.
@@ -292,6 +292,7 @@ export function Generate() {
         brief: form.brief,
         description: isPages ? undefined : (form.describe.trim() || undefined),
         colours: isPages ? undefined : (form.colours.trim() || undefined),
+        universe: isPages ? undefined : (form.universe ?? undefined),
         users: form.users,
         density: form.density,
         data_objects: split(form.data_objects),
@@ -324,13 +325,13 @@ export function Generate() {
   const load = (r: Partial<GenerateRequest>, seed?: number, project?: string | null, concept?: string | null) => {
     if (typed.current && form.brief.trim() && form.brief !== (r.brief ?? '')) setStash({ form, from: 'generation' });
     typed.current = false;
-    setForm((f) => ({ ...f, brief: r.brief ?? '', describe: r.description ?? '', colours: r.colours ?? '', users: r.users ?? '', data_objects: (r.data_objects ?? []).join(', '), style_tags: (r.style_tags ?? []).join(', '), density: r.density ?? f.density, seed: seed != null ? String(seed) : f.seed, archetype: r.archetype ?? 'auto', project: project === undefined ? f.project : project, concept: concept === undefined ? f.concept : concept, page: r.page ?? '', target: r.target ?? 'desktop', pages: r.pages ?? [], looks: r.looks ?? [] }));
+    setForm((f) => ({ ...f, brief: r.brief ?? '', describe: r.description ?? '', colours: r.colours ?? '', universe: r.universe ?? null, users: r.users ?? '', data_objects: (r.data_objects ?? []).join(', '), style_tags: (r.style_tags ?? []).join(', '), density: r.density ?? f.density, seed: seed != null ? String(seed) : f.seed, archetype: r.archetype ?? 'auto', project: project === undefined ? f.project : project, concept: concept === undefined ? f.concept : concept, page: r.page ?? '', target: r.target ?? 'desktop', pages: r.pages ?? [], looks: r.looks ?? [] }));
   };
   const blank = () => {
     setStash(null);
     setSelected('none');
     setMode('look');
-    setForm((f) => ({ ...f, project: null, concept: null, brief: '', users: '', data_objects: '', style_tags: '', seed: '', archetype: 'auto', page: '', pages: [], looks: [], describe: '', colours: '' }));
+    setForm((f) => ({ ...f, project: null, concept: null, brief: '', users: '', data_objects: '', style_tags: '', seed: '', archetype: 'auto', page: '', pages: [], looks: [], describe: '', colours: '', universe: null }));
   };
   const createProject = async () => {
     const name = (newProject ?? '').trim();
@@ -530,6 +531,7 @@ export function Generate() {
               <textarea rows={3} value={form.data_objects} onChange={set('data_objects')} placeholder={t('generate.form.dataObjectsPlaceholder')} aria-label={t('generate.form.dataObjects')} className={areaCls} />
               {<StyleTags value={form.style_tags} onChange={(style_tags) => setForm({ ...form, style_tags })} />}
               <input value={form.colours} onChange={set('colours')} maxLength={200} placeholder={t('generate.form.coloursPlaceholder')} aria-label={t('generate.form.colours')} className={inputCls} />
+              {form.universe && <p className="flex items-center gap-2 text-[12px] text-ink-3"><span className="flex h-3 w-10 overflow-hidden rounded-sm" aria-hidden>{form.universe.palette.map((c) => <span key={c} className="flex-1" style={{ background: c }} />)}</span>{t('generate.form.universe', { name: form.universe.name })}<button type="button" onClick={() => setForm({ ...form, universe: null })} className="underline">{t('generate.form.universeDrop')}</button></p>}
               {form.pages.length > 0 && <p className="text-[12px] text-ink-3">{t('generate.form.pagesList')} · {form.pages.join(' · ')}</p>}
               <div className="flex gap-2">
                 <div className="flex-[3]"><Segmented label={t('generate.form.density')} value={form.density} onChange={(density) => setForm({ ...form, density })} options={['compact', 'comfortable', 'spacious'].map((value) => ({ value }))} /></div>

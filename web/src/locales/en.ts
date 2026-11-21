@@ -207,6 +207,8 @@ export const en = {
   'generate.form.brief': 'Brief',
   'generate.form.projectBriefPlaceholder': 'Project brief',
   'generate.form.users': 'Users',
+  'generate.form.universe': 'Universe: {name}',
+  'generate.form.universeDrop': 'Drop',
   'generate.form.colours': 'Colours',
   'generate.form.coloursPlaceholder': 'Colour wishes, in your words (e.g. bold saturated primaries, no grey) · empty = the look decides',
   'generate.form.dataObjectsPlaceholder': 'Data objects: one per line or comma separated',
