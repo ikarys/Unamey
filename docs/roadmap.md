@@ -13,6 +13,7 @@ self-hosting a team. This file lists the user needs the product must cover, what
 | 4 | **Brief helper**: a quick description expanded by an LLM into the structured brief, reviewed before sending | Done: Describe + Expand in the Generate form, one LLM call, the user reviews the filled brief and the suggested pages (autocomplete on Page) | — |
 | 5 | **Iterate and compare** | Variants, batch Compare, Add variant, refine Versions | Done |
 | 6 | **Change archetype** | Add variant | Done |
+| 8 | **Visual universe** before any screen: three divergent worlds (metaphor, palette, materials, risk), safer / bolder / re-roll, optional steer | Done (2026-11-21): `POST /api/universes`, the chosen universe rides `/api/start` as the binding colours request; rebuilt server-side by `universe::clean` | Universe not yet stored with the project |
 | 7 | **Scoped edits**: change colours, theme, font, radius, density, or the layout, without a free prompt | Done: editable identity tokens + layout-only text in the Direction panel, Apply = one new generation (same project, page, target) | Scope enforced by prompt only; diff check if drift shows up |
 
 ## Order
@@ -21,6 +22,7 @@ self-hosting a team. This file lists the user needs the product must cover, what
 2. Pages (2). Done. Flow: explore variants → pick one as the project's identity → generate pages under it → project pack = SKILL.md + one HTML per page.
 3. Mobile (3). Done. `target: desktop | mobile | both`; "both" produces a desktop and a mobile page per page name, same identity.
 4. Scoped edits (7). Done. Editable tokens and the scoped layout text, one rewrite call, no planner. Since 2026-11-19 edits and refines ask for search/replace edits instead of the whole document to cut output tokens, with a full-rewrite fallback.
+6. Visual universe (8). Done 2026-11-21. Prompted by a comparison with Impeccable, which is better for one or two page websites; Unamey targets multi-screen apps.
 5. Brief helper (4). Done. One call, no storage; suggested pages ride along in the request.
 
 ## Open decisions

@@ -54,7 +54,7 @@ export interface Job {
   // Sum of the job's LLM calls; cost in dollars at each call's model price, null when a call was unpriced.
   llm: { calls: number; seconds: number; prompt: number; cached: number; out: number; cost: number | null; model: string | null };
   // Outcome of a finished job (from its final "result:" log line); only on GET /api/jobs/:id.
-  result?: { generation_ids?: string[]; seed?: number } | null;
+  result?: { generation_ids?: string[]; seed?: number; universes?: Universe[] } | null;
 }
 
 export type JobSort = 'created' | 'duration' | 'cost' | 'account' | 'tokens' | 'llm_time' | 'kind' | 'status';
@@ -102,7 +102,9 @@ export interface GenerateRequest {
 }
 export interface BriefDraft { brief: string; users: string; data_objects: string[]; style_tags: string[]; density: string; pages: string[]; looks: string[]; colours: string; description?: string }
 /** The home flow: a free prompt, the look (archetype id, omitted = the planner proposes), 1-3 variants, theme, and an existing project + empty concept (omitted = new project). */
-export interface StartRequest { text: string; look?: string; variants?: number; theme?: 'auto' | 'light' | 'dark'; target?: 'auto' | 'desktop' | 'mobile'; project?: string; concept?: string }
+/** A visual world proposed before any screen: a metaphor, 5 hex colours (canvas, surface, text, accent, second accent) and materials. */
+export interface Universe { name: string; metaphor: string; pitch: string; palette: string[]; materials: string[]; risk: string }
+export interface StartRequest { universe?: Universe; text: string; look?: string; variants?: number; theme?: 'auto' | 'light' | 'dark'; target?: 'auto' | 'desktop' | 'mobile'; project?: string; concept?: string }
 export interface Archetype { id: string; name: string; feel: string; kind: 'business' | 'consumer' }
 export interface Identity { theme?: string; canvas?: string; surface?: string; border?: string; text?: string; muted?: string; accent?: string; accent2?: string | null; font?: string; mono?: string; radius?: number; density?: string; tone?: string; decoration?: string; glow?: number | null; scanlines?: true | null; caps?: true | null }
 export interface EditRequest { identity?: Identity; layout?: string }
@@ -180,6 +182,7 @@ export const api = {
   searchJobs: (s: JobSearch) =>
     req<JobPage>(`/api/admin/jobs?${new URLSearchParams(Object.entries(s).map(([k, v]) => [k, String(v)]))}`),
   briefHelper: (text: string, images: string[] = []) => req<{ job_id: string }>('/api/brief', json('POST', images.length > 0 ? { text, images } : { text })).then(jobId),
+  universes: (r: { text: string; steer?: string; mode?: 'safer' | 'bolder'; avoid?: string[] }) => req<{ job_id: string }>('/api/universes', json('POST', r)).then(jobId),
   // The user flow: free prompt → framing agent → 3 looks in a new project.
   // `look`: an archetype id → one screen in that look; omitted → three looks picked from the prompt.
   start: (r: StartRequest) => req<{ job_id: string; project_id: string; concept_id: string }>('/api/start', json('POST', r)),
